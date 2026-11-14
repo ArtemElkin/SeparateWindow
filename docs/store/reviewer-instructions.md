@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.0
+# Reviewer instructions — Separate Window 1.4.1
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -13,6 +13,8 @@ The publisher is Mycelium; support: qobuz43@gmail.com.
 8. Start a video and use “Always on top” in the hover toolbar. Chrome displays that video in a separate picture-in-picture window without reloading the source player, including nested cross-origin frames. Press “Return video” or close PiP to return it. Site controls/subtitles may not appear, and some players prohibit PiP. Images and arbitrary widgets do not support this mode. No external component or additional permission is required.
 
 9. Change Language in the extension menu to Русский, English or Automatic. Verify that the popup, existing picker/toolbar, tooltips, messages and context menu update without reloading the page, and the preference survives reopening the menu.
+
+10. Dynamic non-video panels preserve their measured ancestor sizes and are reselected after the page replaces their DOM nodes. Run `python tests/dashboard.py` for a local ResizeObserver-based reproduction with live updates, clicks, window resizing, replacement of both panel and parent, and restoration. No private Grafana instance is required or claimed to have been tested.
 
 The store gallery follows a single real workflow: open the extension menu, select a player, watch the same video in a separate window. The first image combines actual menu header and button captures to focus on the action. The second shows the selection outline, and the third shows the actual clean video frame. The source page surrounds an original canvas-generated demo video with sample advertising banners, recommendations and a subscription panel. A fourth screenshot demonstrates the same extension isolating an interactive calculator; its input fields and calculate button are exercised after detaching it. There are no invented workspaces, third-party movie footage, personal data or service credentials.
 

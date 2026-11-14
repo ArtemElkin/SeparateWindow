@@ -18,7 +18,7 @@
   const targetAttr = `data-${token}-target`;
   const ancestorAttr = `data-${token}-ancestor`;
   let selected, selector, sourceUrl, initialSize, cropStyle, ui, shadow, picker;
-  let ancestors = [], scale = 1, rotation = 0, brightness = 1, fit = true;
+  let ancestors = [], ancestorLayout = [], cropObserver, scale = 1, rotation = 0, brightness = 1, fit = true;
   let marker, markerTarget, markerEvents, savedSelector, noticeTimer, detached = false, pinButton, pipActive = false, cleanVideo = true;
 
   async function send(type, extra = {}) {
@@ -155,6 +155,11 @@
     const rotated = rotation % 180 !== 0;
     const factor = fit ? Math.min(availableW / (rotated ? h : w), availableH / (rotated ? w : h)) * scale : scale;
     const target = `[${targetAttr}]`, ancestor = `[${ancestorAttr}]`, host = `[data-${token}-ui]`;
+    // Dashboard renderers measure their parents. display:contents gives those
+    // parents a zero-sized box and can make the site unmount the selected panel.
+    const layout = initialSize.media ? '' : ancestorLayout.map((box, index) =>
+      `[${ancestorAttr}="${index}"]{display:${box.display}!important;box-sizing:content-box!important;width:${box.width}px!important;height:${box.height}px!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;container-type:${box.containerType}!important}`
+    ).join('\n');
     cropStyle.textContent = `
       html,body{overflow:hidden!important;min-width:0!important;min-height:0!important}
       ${ancestor}{display:contents!important;position:static!important;margin:0!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;outline:0!important;transform:none!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;filter:none!important;backdrop-filter:none!important;perspective:none!important;contain:none!important;container-type:normal!important;content-visibility:visible!important;clip:auto!important;clip-path:none!important;overflow:visible!important;opacity:1!important;isolation:auto!important;mix-blend-mode:normal!important;will-change:auto!important}
@@ -163,15 +168,17 @@
       ${ancestor} > :not(${ancestor}):not(${target}):not(${host}):not(style):not(script):not(link){display:none!important}
       ${target}{display:${initialSize.display}!important;position:fixed!important;inset:auto!important;left:50%!important;top:50%!important;width:${w}px!important;height:${h}px!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;z-index:2147483640!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;transform:translate(-50%,-50%) rotate(${rotation}deg) scale(${factor})!important;transform-origin:center!important;filter:brightness(${brightness})!important;box-sizing:border-box!important;visibility:visible!important;}
       ${host}{display:block!important}
+      ${layout}
     `;
   }
 
   function unCrop(showMarker = true) {
     stopPicker();
+    cropObserver?.disconnect(); cropObserver = null;
     cropStyle?.remove(); cropStyle = null;
     selected?.removeAttribute(targetAttr);
     for (const ancestor of ancestors) ancestor.removeAttribute(ancestorAttr);
-    ancestors = []; selected = null; detached = false;
+    ancestors = []; ancestorLayout = []; selected = null; detached = false;
     ui?.remove(); ui = null; shadow = null;
     if (showMarker) installMarker(savedSelector);
   }
@@ -268,17 +275,49 @@
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) throw new Error(t('hiddenBlock'));
     selector = cssSelector(element); savedSelector = selector; sourceUrl = location.href;
-    initialSize = {width: rect.width, height: rect.height, display: getComputedStyle(element).display};
+    initialSize = {width: rect.width, height: rect.height, display: getComputedStyle(element).display, media: element.matches('video,iframe,frame')};
     selected = element; scale = 1; rotation = 0; brightness = 1; fit = true;
     removeMarker(); selected.setAttribute(targetAttr, '');
-    for (let ancestor = selected.parentElement; ancestor; ancestor = ancestor.parentElement) {ancestor.setAttribute(ancestorAttr, ''); ancestors.push(ancestor);}
+    markAncestors();
     cropStyle = document.createElement('style'); document.documentElement.append(cropStyle);
     cleanVideo = true; toolbar(); renderCrop();
+    cropObserver = new MutationObserver(() => {
+      if (selected?.isConnected) return;
+      // Frameworks can replace a panel on refresh. Follow its original selector
+      // without reparenting/cloning nodes or reloading the live document.
+      const replacement = document.querySelector(selector);
+      if (!replacement) return;
+      // The crop hides newly inserted, unmarked ancestors. Measure them with
+      // the page's layout restored, then reapply crop before the next paint.
+      cropStyle.disabled = true;
+      selected?.removeAttribute(targetAttr);
+      for (const ancestor of ancestors) ancestor.removeAttribute(ancestorAttr);
+      selected = replacement; selected.setAttribute(targetAttr, '');
+      markAncestors(); renderCrop();
+      cropStyle.disabled = false;
+    });
+    cropObserver.observe(document.documentElement, {childList:true, subtree:true});
     try {
       await send('detach', {selector, width: rect.width, height: rect.height}); detached = true;
       await send('clean-media', {selector, frameRoots: mediaFrameRoots()}).catch(error => notify(error.message));
     }
     catch (error) {unCrop(); throw error;}
+  }
+
+  function markAncestors() {
+    const previous = new Map(ancestors.map((node, index) => [node, ancestorLayout[index]]));
+    ancestors = []; ancestorLayout = [];
+    for (let node = selected.parentElement; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const box = previous.get(node) || {
+        display: style.display === 'contents' ? 'block' : style.display,
+        width: Math.max(0, node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)),
+        height: Math.max(0, node.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)),
+        containerType: style.containerType
+      };
+      node.setAttribute(ancestorAttr, String(ancestors.length));
+      ancestors.push(node); ancestorLayout.push(box);
+    }
   }
 
   function mediaFrameRoots() {

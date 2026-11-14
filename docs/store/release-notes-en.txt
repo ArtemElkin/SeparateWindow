@@ -1,1 +1,1 @@
-Choose Russian, English or your browser language in the extension menu. Your preference is saved and applies throughout the extension, including existing windows, tooltips and messages, without reloading video.
+Fixed blank windows when opening dynamic dashboard panels. Parent container dimensions are preserved, and selected panels are tracked when the page replaces them during an update. Panels remain live and interactive.

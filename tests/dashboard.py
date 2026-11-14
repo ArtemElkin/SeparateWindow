@@ -1,0 +1,108 @@
+"""A live dashboard panel must survive crop and its framework replacing it."""
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import io
+import tempfile
+import threading
+from PIL import Image
+from playwright.sync_api import sync_playwright
+
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURE = b'''<!doctype html><style>
+body{margin:0;background:#111;color:#bbc4d5;font:20px sans-serif}
+header{height:80px}#dashboard{width:1100px;height:750px;transform:translateZ(0)}
+#cell{width:600px;height:360px;margin:24px;container-type:inline-size}
+#stat{width:100%;height:100%;box-sizing:border-box;background:#1e2736;padding:24px}
+#value{color:#5794f2;font-size:100px}#outside{position:fixed;right:0;top:0;background:red}
+</style><header>Dashboard</header><main id="dashboard"><div id="cell"><section id="stat">
+<div>Processed</div><button id="value">1000</button></section></div></main>
+<aside id="outside">Outside panel</aside><script>
+window.identity=crypto.randomUUID();window.ticks=0;window.zeroSizes=0;
+const cell=document.querySelector('#cell');
+const original=document.querySelector('#stat').outerHTML;
+function mount(){cell.innerHTML=original;document.querySelector('#value').onclick=()=>window.ticks++;}
+mount();
+new ResizeObserver(entries=>{
+ const r=entries[0].contentRect;
+ if(!r.width||!r.height){window.zeroSizes++;cell.replaceChildren();}
+ else if(!document.querySelector('#stat'))mount();
+}).observe(cell);
+window.replacePanel=mount;
+window.replaceContainer=()=>{document.querySelector('#cell').outerHTML='<div id="cell">'+original+'</div>';document.querySelector('#value').onclick=()=>window.ticks++;};
+setInterval(()=>{const n=document.querySelector('#value');if(n)n.textContent=String(1000+window.ticks++);},100);
+</script>'''
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(FIXTURE)
+
+    def log_message(self, *args):
+        pass
+
+
+def main():
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f'http://127.0.0.1:{server.server_port}/'
+    try:
+        with tempfile.TemporaryDirectory(prefix='sw-dashboard-') as profile, sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(profile, channel='chromium', headless=True,
+                viewport={'width':1280,'height':900}, args=[f'--disable-extensions-except={ROOT}', f'--load-extension={ROOT}'])
+            try:
+                worker = context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
+                page = context.pages[0]
+                page.goto(url)
+                page.wait_for_function('window.ticks>1')
+                identity = page.evaluate('window.identity')
+                dimensions = page.locator('#cell').evaluate('(e)=>({w:e.clientWidth,h:e.clientHeight})')
+                worker.evaluate("""async url=>{const [tab]=await chrome.tabs.query({url});await tell(tab.id,'select');}""", url)
+                box = page.locator('#stat').bounding_box()
+                page.mouse.move(box['x']+8,box['y']+8)
+                page.mouse.click(box['x']+8,box['y']+8)
+                page.wait_for_timeout(500)
+                page.screenshot(path=str(ROOT/'tests/dashboard-selected.png'))
+                assert page.locator('#stat').count()==1, f'BLACK WINDOW: panel unmounted; zero-size notifications={page.evaluate("window.zeroSizes")}'
+                assert page.locator('#stat').is_visible(), 'BLACK WINDOW: selected panel hidden'
+                assert page.evaluate('window.zeroSizes')==0, 'Crop must not collapse a measured dashboard container'
+                assert page.locator('#cell').evaluate('(e)=>({w:e.clientWidth,h:e.clientHeight})')==dimensions
+                before = page.evaluate('window.ticks')
+                page.locator('#value').click()
+                assert page.evaluate('window.ticks')>before
+                page.set_viewport_size({'width':800,'height':620})
+                page.wait_for_timeout(150)
+                assert page.locator('#stat').is_visible()
+                page.evaluate('window.replacePanel()')
+                page.wait_for_timeout(150)
+                assert page.locator('#stat').is_visible(), 'BLACK WINDOW: replacement panel lost crop attributes'
+                assert page.locator('#stat').evaluate('(e)=>e.getAttributeNames().some(n=>n.endsWith("-target"))')
+                page.locator('#value').click()
+                page.evaluate('window.replaceContainer()')
+                page.wait_for_timeout(150)
+                assert page.locator('#cell').evaluate('(e)=>({w:e.clientWidth,h:e.clientHeight})')==dimensions, 'Replacement ancestors must be measured before crop hides them'
+                page.locator('#value').click()
+                assert page.evaluate('window.identity')==identity
+                assert not page.locator('#outside').is_visible()
+                assert not page.locator('header').is_visible()
+                bounds = page.locator('#stat').bounding_box()
+                assert abs(bounds['x']+bounds['width']/2-400)<2
+                assert abs(bounds['y']+bounds['height']/2-310)<2
+                png = page.screenshot()
+                image=Image.open(io.BytesIO(png)).convert('RGB')
+                assert image.getpixel((400,200)) != (0,0,0), 'Panel must actually paint, not merely have a DOM box'
+                worker.evaluate("""async url=>{const [tab]=await chrome.tabs.query({url});await restore(tab.id);}""", url)
+                assert page.locator('header').is_visible() and page.locator('#outside').is_visible()
+                assert page.locator('#cell').evaluate('(e)=>getComputedStyle(e).containerType')=='inline-size'
+                assert not page.locator('#stat').evaluate('(e)=>e.getAttributeNames().some(n=>n.endsWith("-target"))')
+                print('PASS: measured live panel, updates, clicks, resize, DOM replacement, painted pixels and restore')
+            finally:
+                context.close()
+    finally:
+        server.shutdown()
+
+
+if __name__=='__main__':
+    main()
