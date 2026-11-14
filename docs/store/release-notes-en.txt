@@ -1,1 +1,1 @@
-Fixed blank windows when opening dynamic dashboard panels. Parent container dimensions are preserved, and selected panels are tracked when the page replaces them during an update. Panels remain live and interactive.
+Larger toolbar icon, RU / EN language buttons, a Rate us link and a Feedback section for bug reports, feature suggestions and email support.

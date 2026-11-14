@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Separate Window",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "__MSG_extensionDescription__",
   "default_locale": "ru",
   "author": "Mycelium",
@@ -24,10 +24,9 @@
     "default_popup": "popup.html",
     "default_title": "Separate Window",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/action16.png",
+      "32": "icons/action32.png",
+      "48": "icons/action48.png"
     }
   },
   "icons": {

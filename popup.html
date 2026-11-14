@@ -9,12 +9,12 @@
 </head>
 <body>
   <header class="app-header">
-    <img src="icons/icon48.png" width="40" height="40" alt="">
+    <img src="icons/action48.png" width="40" height="40" alt="">
     <div><h1><a href="https://chromewebstore.google.com/detail/separate-window/fhcafcdfknddjfgbbkhpglgamceiclcm" target="_blank" rel="noopener noreferrer">Separate Window</a></h1><p data-i18n="appTagline">Больше места для главного</p></div>
     <span class="version" id="version"></span>
   </header>
   <main>
-    <div class="language"><label for="language" data-i18n="languageLabel">Язык</label><select id="language"><option value="auto" data-i18n="languageAuto">Автоматически</option><option value="ru">Русский</option><option value="en">English</option></select></div>
+    <div class="language"><span id="language-label" data-i18n="languageLabel">Язык</span><div id="language" class="language-switch" role="group" aria-labelledby="language-label"><button type="button" data-language="ru" aria-label="Русский" aria-pressed="false">RU</button><button type="button" data-language="en" aria-label="English" aria-pressed="false">EN</button></div></div>
     <section class="selection" aria-labelledby="selection-title">
       <h2 id="selection-title" data-i18n="popupHeading">Любой блок — отдельное окно</h2>
       <p data-i18n="popupIntro">Смотрите видео, следите за виджетом или работайте с частью страницы без лишнего вокруг.</p>
@@ -26,9 +26,14 @@
       <button id="forget" class="quiet" data-i18n="forgetButton">Забыть выбор для этой страницы</button>
     </section>
     <div id="status" role="status" aria-live="polite"></div>
+    <section class="feedback" aria-labelledby="feedback-heading">
+      <h2 id="feedback-heading" data-i18n="feedbackHeading">Обратная связь</h2>
+      <div class="feedback-links"><a id="report-bug" target="_blank" rel="noopener noreferrer" data-i18n="reportBug">Сообщить о баге</a><a id="suggest-feature" target="_blank" rel="noopener noreferrer" data-i18n="suggestFeature">Предложить идею</a></div>
+      <p><span data-i18n="feedbackEmail">Или напишите</span> <a href="mailto:qobuz43@gmail.com">qobuz43@gmail.com</a></p>
+    </section>
     <div class="shortcut"><span data-i18n="quickAccess">Быстрый вызов</span><kbd>Alt</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>S</kbd></div>
   </main>
-  <footer><span>Mycelium</span><nav><a href="https://github.com/MerlinRus/SeparateWindow#readme" target="_blank" rel="noopener noreferrer" data-i18n="helpLink">Помощь</a><a href="https://merlinrus.github.io/SeparateWindow/privacy.html" target="_blank" rel="noopener noreferrer" data-i18n="privacyLink">Конфиденциальность</a></nav></footer>
+  <footer><span>Mycelium</span><nav><a id="rate" href="https://chromewebstore.google.com/detail/separate-window/fhcafcdfknddjfgbbkhpglgamceiclcm/reviews" target="_blank" rel="noopener noreferrer" data-i18n="rateLink">Оценить нас</a><a href="https://github.com/MerlinRus/SeparateWindow#readme" target="_blank" rel="noopener noreferrer" data-i18n="helpLink">Помощь</a><a href="https://merlinrus.github.io/SeparateWindow/privacy.html" target="_blank" rel="noopener noreferrer" data-i18n="privacyLink">Конфиденциальность</a></nav></footer>
   <script src="i18n.js"></script><script src="popup.js"></script>
 </body>
 </html>

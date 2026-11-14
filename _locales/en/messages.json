@@ -205,5 +205,32 @@
   },
   "languageAuto": {
     "message": "Automatic (browser language)"
+  },
+  "rateLink": {
+    "message": "Rate us"
+  },
+  "feedbackHeading": {
+    "message": "Feedback"
+  },
+  "reportBug": {
+    "message": "Report a bug"
+  },
+  "suggestFeature": {
+    "message": "Suggest a feature"
+  },
+  "feedbackEmail": {
+    "message": "Or email"
+  },
+  "bugTitle": {
+    "message": "Bug: short description"
+  },
+  "featureTitle": {
+    "message": "Idea: short description"
+  },
+  "bugBody": {
+    "message": "Separate Window version: $1\n\nWhat happened?\n\nWhat did you expect?\n\nSteps to reproduce:\n\nWebsite and browser version (if you can share):\n\nScreenshot (optional):\n"
+  },
+  "featureBody": {
+    "message": "Separate Window version: $1\n\nWhat would you like to add?\n\nWhat would it help you do?\n"
   }
 }

@@ -1,5 +1,6 @@
 """Render the existing arrow mark as Chrome PNG icons and a favicon."""
 from pathlib import Path
+import sys
 import tempfile
 from PIL import Image
 from playwright.sync_api import sync_playwright
@@ -13,8 +14,13 @@ with sync_playwright() as p, tempfile.TemporaryDirectory() as temp:
     raw = Path(temp) / 'master.png'
     page.screenshot(path=str(raw), omit_background=True)
     source = Image.open(raw).convert('RGBA')
-    for size in (16, 32, 48, 128, 256, 512):
-        source.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/icon{size}.png')
-    source.save(ROOT / 'icons/favicon.ico', sizes=[(16,16), (32,32), (48,48)])
+    if '--toolbar-only' not in sys.argv:
+        for size in (16, 32, 48, 128, 256, 512):
+            source.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/icon{size}.png')
+        source.save(ROOT / 'icons/favicon.ico', sizes=[(16,16), (32,32), (48,48)])
+    # Toolbar icons use the full canvas; store icons retain their required padding.
+    toolbar = source.crop((64, 64, 448, 448))
+    for size in (16, 32, 48):
+        toolbar.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/action{size}.png')
     browser.close()
-print('Rendered icons: 16, 32, 48, 128, 256, 512; favicon.ico')
+print('Rendered toolbar icons: 16, 32, 48' if '--toolbar-only' in sys.argv else 'Rendered toolbar/store icons and favicon.ico')

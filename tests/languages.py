@@ -25,15 +25,21 @@ def main():
                 popup_url = f'chrome-extension://{worker.url.split("/")[2]}/popup.html'
                 popup = context.new_page(); popup.goto(popup_url)
                 popup.locator('#version').wait_for()
-                assert popup.locator('#language').input_value() == 'auto'
+                assert popup.evaluate('SWI18n.preference') == 'auto'
                 browser_language = popup.locator('html').get_attribute('lang')
                 def switch(lang):
-                    popup.locator('#language').select_option(lang)
+                    if lang=='auto':
+                        worker.evaluate('chrome.storage.local.remove("language")')
+                    else:
+                        popup.locator(f'[data-language="{lang}"]').click()
                     expected = browser_language if lang=='auto' else lang
                     popup.wait_for_function('(lang)=>document.documentElement.lang===lang',arg=expected)
-                    popup.wait_for_function('!document.querySelector("#language").disabled')
+                    popup.wait_for_function('![...document.querySelectorAll("[data-language]")].some(b=>b.disabled)')
+                    assert popup.locator(f'[data-language="{expected}"]').get_attribute('aria-pressed')=='true'
+                    assert popup.locator('[data-language][aria-pressed="true"]').count()==1
                     assert popup.locator('#select').inner_text().strip().endswith(dictionaries[expected]['selectButton']['message'])
                     assert popup.locator('body').evaluate('(e)=>e.scrollWidth<=innerWidth')
+                    assert popup.locator('#status').inner_text()==''
                     worker.evaluate('''async title=>{for(let i=0;i<40;i++){if(globalThis.menuTitle===title)return;await new Promise(r=>setTimeout(r,50));}throw new Error('Context menu not translated');}''', dictionaries[expected]['contextMenu']['message'])
                 page = context.pages[0]
                 url = f'http://127.0.0.1:{server.server_port}/'
@@ -62,7 +68,7 @@ def main():
                 assert dictionaries['en']['returnTitle']['message'] not in labels()
                 assert page.evaluate('window.identity')==identity
                 popup.reload();popup.locator('#version').wait_for()
-                assert popup.locator('#language').input_value()=='ru'
+                assert popup.locator('[data-language="ru"]').get_attribute('aria-pressed')=='true'
                 result=popup.evaluate('''async () => {
                   const [tab]=await chrome.tabs.query({url:'http://127.0.0.1/*'});
                   return chrome.runtime.sendMessage({type:'bad-command',tabId:tab.id});

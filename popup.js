@@ -2,21 +2,29 @@ function render() {
   document.documentElement.lang = SWI18n.language;
   for (const element of document.querySelectorAll('[data-i18n]')) element.textContent = SWI18n.t(element.dataset.i18n);
   for (const element of document.querySelectorAll('[data-i18n-label]')) element.setAttribute('aria-label', SWI18n.t(element.dataset.i18nLabel));
-  document.querySelector('#language').value = SWI18n.preference;
-  document.querySelector('#version').textContent = chrome.runtime.getManifest().version;
+  for (const button of document.querySelectorAll('[data-language]')) button.setAttribute('aria-pressed', String(button.dataset.language === SWI18n.language));
+  const version = chrome.runtime.getManifest().version;
+  document.querySelector('#version').textContent = version;
+  for (const [id, title, body] of [['report-bug','bugTitle','bugBody'], ['suggest-feature','featureTitle','featureBody']]) {
+    const url = new URL('https://github.com/MerlinRus/SeparateWindow/issues/new');
+    url.searchParams.set('title', SWI18n.t(title));
+    url.searchParams.set('body', SWI18n.t(body, version));
+    document.getElementById(id).href = url.href;
+  }
 }
 SWI18n.onChange(old => {
   render(); const status = document.querySelector('#status'); status.textContent = SWI18n.translate(status.textContent, old);
 });
 SWI18n.ready.then(render);
-document.querySelector('#language').addEventListener('change', async event => {
-  const select = event.target; select.disabled = true;
-  try {await chrome.storage.local.set({language:select.value}); await SWI18n.reload(); render();}
+for (const language of document.querySelectorAll('[data-language]')) language.addEventListener('click', async () => {
+  const buttons = document.querySelectorAll('[data-language]');
+  for (const button of buttons) button.disabled = true;
+  try {await chrome.storage.local.set({language:language.dataset.language}); await SWI18n.reload(); render();}
   catch (error) {document.querySelector('#status').textContent = error.message;}
-  finally {select.disabled = false;}
+  finally {for (const button of buttons) button.disabled = false;}
 });
 
-for (const button of document.querySelectorAll('button')) {
+for (const button of document.querySelectorAll('#select,#restore,#forget')) {
   button.addEventListener('click', async () => {
     button.disabled = true;
     try {

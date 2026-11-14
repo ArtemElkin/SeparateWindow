@@ -43,6 +43,8 @@ with Image.open(ROOT/'icons/favicon.ico') as image:
 package = ROOT/f'dist/separate-window-{manifest["version"]}.zip'
 with tempfile.TemporaryDirectory(prefix='sw-package-') as temp, zipfile.ZipFile(package) as archive:
     assert archive.testzip() is None
+    for path in manifest['action']['default_icon'].values():
+        assert path in archive.namelist(), path
     extracted = Path(temp)/'extension'
     archive.extractall(extracted)
     assert 'tests/smoke.py' not in archive.namelist()

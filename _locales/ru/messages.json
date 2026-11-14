@@ -205,5 +205,32 @@
   },
   "languageAuto": {
     "message": "Автоматически (язык браузера)"
+  },
+  "rateLink": {
+    "message": "Оценить нас"
+  },
+  "feedbackHeading": {
+    "message": "Обратная связь"
+  },
+  "reportBug": {
+    "message": "Сообщить о баге"
+  },
+  "suggestFeature": {
+    "message": "Предложить идею"
+  },
+  "feedbackEmail": {
+    "message": "Или напишите"
+  },
+  "bugTitle": {
+    "message": "Баг: краткое описание"
+  },
+  "featureTitle": {
+    "message": "Идея: краткое описание"
+  },
+  "bugBody": {
+    "message": "Версия Separate Window: $1\n\nЧто произошло?\n\nЧто должно было произойти?\n\nКак повторить проблему?\n\nСайт и версия браузера (если можете указать):\n\nСкриншот (по желанию):\n"
+  },
+  "featureBody": {
+    "message": "Версия Separate Window: $1\n\nЧто предлагаете добавить?\n\nКакую задачу это поможет решить?\n"
   }
 }
