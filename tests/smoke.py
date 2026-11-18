@@ -254,20 +254,22 @@ def main():
             click_control('Повернуть на 90°')
             print('PASS: saved window geometry, rotation')
 
+            page.locator('video').evaluate('(v)=>v.style.cssText="position:absolute;inset:0;width:100%;height:100%"')
             before_pip = page.locator('video').evaluate('(v)=>v.currentTime')
-            click_control('Показать видео поверх всех окон (картинка в картинке)')
+            click_control('Показать выбранный блок поверх всех окон')
             page.wait_for_function('document.pictureInPictureElement === document.querySelector("video")', timeout=5000)
-            assert control('Вернуть видео из режима картинки в картинке', 'function(){return this.getAttribute("aria-pressed")}') == 'true'
+            assert control('Закрыть окно поверх остальных', 'function(){return this.getAttribute("aria-pressed")}') == 'true'
             assert page.evaluate('window.identity') == identity
             assert page.locator('video').evaluate('(v)=>v.currentTime') >= before_pip
-            click_control('Вернуть видео из режима картинки в картинке')
+            click_control('Закрыть окно поверх остальных')
             page.wait_for_function('!document.pictureInPictureElement')
-            assert control('Показать видео поверх всех окон (картинка в картинке)', 'function(){return this.getAttribute("aria-pressed")}') == 'false'
-            click_control('Показать видео поверх всех окон (картинка в картинке)')
+            assert control('Показать выбранный блок поверх всех окон', 'function(){return this.getAttribute("aria-pressed")}') == 'false'
+            click_control('Показать выбранный блок поверх всех окон')
             page.wait_for_function('!!document.pictureInPictureElement')
             page.evaluate('document.exitPictureInPicture()')
             page.wait_for_timeout(200)
-            assert control('Показать видео поверх всех окон (картинка в картинке)', 'function(){return this.getAttribute("aria-pressed")}') == 'false', 'Native PiP close must reset the button'
+            assert control('Показать выбранный блок поверх всех окон', 'function(){return this.getAttribute("aria-pressed")}') == 'false', 'Native PiP close must reset the button'
+            page.locator('video').evaluate('(v)=>v.removeAttribute("style")')
             print('PASS: video PiP toggle, original DOM/playback preserved, native close updates button')
 
             with page.expect_download() as download:

@@ -13,6 +13,10 @@
         if (element.hasAttribute(attr)) element.setAttribute(attr, SWI18n.translate(element.getAttribute(attr), old));
       }
     }
+    if (blockPreview?.window && !blockPreview.window.closed) {
+      blockPreview.window.document.title = t('pinPreviewTitle');
+      blockPreview.video.setAttribute('aria-label', t('pinPreviewTitle'));
+    }
   });
   const token = `sw-${crypto.randomUUID().replaceAll('-', '')}`;
   const targetAttr = `data-${token}-target`;
@@ -20,6 +24,7 @@
   let selected, selector, sourceUrl, initialSize, cropStyle, ui, shadow, picker;
   let ancestors = [], ancestorLayout = [], cropObserver, scale = 1, rotation = 0, brightness = 1, fit = true;
   let marker, markerTarget, markerEvents, savedSelector, noticeTimer, detached = false, pinButton, pipActive = false, cleanVideo = true;
+  let blockPreview;
 
   async function send(type, extra = {}) {
     const result = await chrome.runtime.sendMessage({type, ...extra});
@@ -174,6 +179,7 @@
 
   function unCrop(showMarker = true) {
     stopPicker();
+    closeBlockPreview();
     cropObserver?.disconnect(); cropObserver = null;
     cropStyle?.remove(); cropStyle = null;
     selected?.removeAttribute(targetAttr);
@@ -210,6 +216,107 @@
     } finally {ui?.style.setProperty('visibility', 'visible', 'important');}
   }
 
+  function closeBlockPreview(preview = blockPreview, closeWindow = true) {
+    if (!preview || blockPreview !== preview) return;
+    blockPreview = null;
+    clearTimeout(preview.expiry);
+    preview.track?.stop();
+    if (closeWindow && preview.window && !preview.window.closed) preview.window.close();
+    renderPinButton();
+  }
+
+  async function cropBlockPreview(preview, element) {
+    const target = await CropTarget.fromElement(element);
+    if (blockPreview !== preview || selected !== element) return false;
+    await preview.track.cropTo(target);
+    return blockPreview === preview && selected === element;
+  }
+
+  async function showBlockPreview(preview) {
+    clearTimeout(preview.expiry);
+    try {
+      const previewWindow = await documentPictureInPicture.requestWindow({
+        width: Math.round(initialSize.width),
+        height: Math.round(initialSize.height)
+      });
+      if (blockPreview !== preview) {previewWindow.close(); return;}
+      preview.window = previewWindow;
+      previewWindow.addEventListener('pagehide', () => closeBlockPreview(preview, false), {once: true});
+      previewWindow.document.title = t('pinPreviewTitle');
+      previewWindow.document.documentElement.lang = SWI18n.language;
+      previewWindow.document.body.style.cssText = 'margin:0;background:#000;overflow:hidden';
+      const video = previewWindow.document.createElement('video');
+      preview.video = video;
+      video.setAttribute('aria-label', t('pinPreviewTitle'));
+      video.style.cssText = 'display:block;width:100vw;height:100vh;object-fit:contain';
+      video.muted = true;
+      video.srcObject = new MediaStream([preview.track]);
+      previewWindow.document.body.append(video);
+      await video.play();
+      renderPinButton();
+    } catch {
+      if (blockPreview !== preview) return;
+      closeBlockPreview(preview);
+      throw new Error(t('pinPreviewError'));
+    }
+  }
+
+  async function startBlockPreview() {
+    if (!window.documentPictureInPicture || !window.CropTarget || !navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error(t('pinPreviewUnavailable'));
+    }
+    const chromium = Number(navigator.userAgent.match(/Chrome\/(\d+)/)?.[1]);
+    // Older Windows Chromium builds can crash on stopping a tab capture.
+    if (/^Win/i.test(navigator.userAgentData?.platform || navigator.platform) && chromium && chromium < 156) {
+      throw new Error(t('pinPreviewUpdateChrome'));
+    }
+    const preview = {};
+    blockPreview = preview;
+    let stream;
+    notify(t('pinChooseTab'));
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {displaySurface: 'browser'}, audio: false, preferCurrentTab: true,
+        selfBrowserSurface: 'include', surfaceSwitching: 'exclude', monitorTypeSurfaces: 'exclude'
+      });
+    } catch {
+      if (blockPreview !== preview) return;
+      closeBlockPreview(preview);
+      throw new Error(t('pinShareError'));
+    }
+    const [track] = stream.getVideoTracks();
+    if (blockPreview !== preview) {
+      track?.stop();
+      return;
+    }
+    preview.track = track;
+    try {
+      if (track?.getSettings().displaySurface !== 'browser' || !track.cropTo) throw new Error();
+      // Chrome accepts this element as the crop target only for capture of its own tab.
+      let cropped = await cropBlockPreview(preview, selected);
+      if (!cropped && blockPreview === preview) cropped = await cropBlockPreview(preview, selected);
+      if (!cropped || track.readyState !== 'live') throw new Error();
+      preview.cropped = true;
+    } catch {
+      if (blockPreview !== preview) return;
+      closeBlockPreview(preview);
+      throw new Error(t('pinWrongTab'));
+    }
+    if (blockPreview !== preview) return;
+    track.addEventListener('ended', () => closeBlockPreview(preview), {once: true});
+    clearTimeout(noticeTimer);
+    shadow?.querySelector('.notice')?.remove();
+    if (navigator.userActivation.isActive) {
+      await showBlockPreview(preview);
+    } else {
+      preview.expiry = setTimeout(() => closeBlockPreview(preview), 30000);
+      renderPinButton();
+      notify(t('pinPreviewContinueHint'));
+    }
+  }
+
+  window.addEventListener('pagehide', () => closeBlockPreview());
+
   function toolbar() {
     ({host: ui, root: shadow} = makeUI());
     const bar = document.createElement('div'); bar.className = 'bar'; bar.setAttribute('aria-label', t('controls'));
@@ -233,8 +340,11 @@
       button.title = button.textContent; button.setAttribute('aria-label', button.title);
     });
     pinButton = button(t('pin'), t('pinTitle'), async () => {
-      const result = await send('video-pin', {selector: `[${targetAttr}]`, frameRoots: mediaFrameRoots()});
-      setPinState(result.active);
+      if (blockPreview?.window) {closeBlockPreview(); return;}
+      if (blockPreview?.track) {await showBlockPreview(blockPreview); return;}
+      const result = await send('video-pin', {selector: `[${targetAttr}]`});
+      if (result.found) setPinState(result.active);
+      else if (selected && detached) await startBlockPreview();
     });
     setPinState(pipActive);
     button(t('size'), t('sizeTitle'), async button => {
@@ -263,9 +373,15 @@
 
   function setPinState(active) {
     pipActive = active;
+    renderPinButton();
+  }
+
+  function renderPinButton() {
     if (!pinButton) return;
-    pinButton.textContent = t(active ? 'unpin' : 'pin');
-    pinButton.title = t(active ? 'unpinTitle' : 'pinTitle');
+    const active = pipActive || !!blockPreview?.window;
+    const ready = !active && !!blockPreview?.track;
+    pinButton.textContent = t(active ? 'unpin' : ready ? 'pinPreviewContinue' : 'pin');
+    pinButton.title = t(active ? 'unpinTitle' : ready ? 'pinPreviewContinueTitle' : 'pinTitle');
     pinButton.setAttribute('aria-label', pinButton.title);
     pinButton.setAttribute('aria-pressed', String(active));
   }
@@ -295,6 +411,14 @@
       selected = replacement; selected.setAttribute(targetAttr, '');
       markAncestors(); renderCrop();
       cropStyle.disabled = false;
+      if (blockPreview?.cropped) {
+        const preview = blockPreview;
+        cropBlockPreview(preview, replacement).catch(() => {
+          if (blockPreview !== preview || selected !== replacement) return;
+          closeBlockPreview(preview);
+          notify(t('pinPreviewError'));
+        });
+      }
     });
     cropObserver.observe(document.documentElement, {childList:true, subtree:true});
     try {

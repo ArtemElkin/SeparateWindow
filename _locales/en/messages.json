@@ -183,19 +183,49 @@
     "message": "📌 Always on top"
   },
   "unpin": {
-    "message": "📌 Return video"
+    "message": "📌 Unpin"
   },
   "pinTitle": {
-    "message": "Show video above all windows (picture-in-picture)"
+    "message": "Show the selected element above other windows"
   },
   "unpinTitle": {
-    "message": "Return video from picture-in-picture"
+    "message": "Close the floating window"
   },
   "pipNoVideo": {
-    "message": "No ready video in the selected element. Start playback and try again. This mode is unavailable for images and widgets."
+    "message": "The selected video changed. Try pinning it again."
   },
   "pipBlocked": {
     "message": "The player or browser does not allow picture-in-picture for this video."
+  },
+  "pinChooseTab": {
+    "message": "Choose “This tab” in Chrome’s dialog to preview the selected element."
+  },
+  "pinPreviewTitle": {
+    "message": "Selected element preview"
+  },
+  "pinPreviewContinue": {
+    "message": "Open preview"
+  },
+  "pinPreviewContinueTitle": {
+    "message": "Open the floating preview"
+  },
+  "pinPreviewContinueHint": {
+    "message": "The tab is selected. Click “Open preview” to continue."
+  },
+  "pinPreviewUnavailable": {
+    "message": "A floating preview is unavailable on this page. Try opening it over HTTPS in Chrome."
+  },
+  "pinPreviewUpdateChrome": {
+    "message": "Update to Chrome 156 or later to use live previews on Windows."
+  },
+  "pinShareError": {
+    "message": "Chrome didn’t allow tab sharing. Click “Always on top” again and allow sharing this tab."
+  },
+  "pinWrongTab": {
+    "message": "Choose the tab that contains the selected element."
+  },
+  "pinPreviewError": {
+    "message": "Couldn’t open the live preview. Try pinning the element again."
   },
   "linkError": {
     "message": "Could not open link: $1"

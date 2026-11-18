@@ -1,4 +1,4 @@
-# Privacy practices — Separate Window 1.4.0
+# Privacy practices — Separate Window 1.4.4
 
 Publisher: Mycelium. Contact: qobuz43@gmail.com.
 
@@ -20,7 +20,7 @@ Stores the interface language preference, per-page CSS selectors and optional wi
 
 Injects packaged selection/isolation code into already-open pages when no active content-script listener is available. The user starts selection through the extension button, shortcut or context menu. No remote JavaScript is injected.
 
-On an explicit “Always on top” click, packaged code also locates a ready video within the selected block and its descendant frames and toggles Chrome's built-in picture-in-picture API. Frame paths, video dimensions and temporary playback availability are processed in memory only. No video stream is captured or sent to the extension or developer.
+On an explicit “Always on top” click, packaged code locates the main video within the selected block and its descendant frames and toggles Chrome’s built-in picture-in-picture API. For other blocks, Chrome asks the user to share the current tab. A temporary, silent stream displays only the selected area in a floating preview. Preview pixels are processed in memory, without recording, saving or uploading them. Closing the preview or restoring the original tab stops the stream.
 
 ### contextMenus
 
@@ -45,7 +45,7 @@ Select **No, I am not using remote code**. All executable extension code is insi
 Accurately disclose the locally processed data relevant to the dashboard categories:
 
 - **Web history:** current and saved page URLs used for selection links, per-page settings and tab recovery. The extension does not read Chrome's history database.
-- **Website content:** DOM structure/CSS selector for the chosen element, page title and user-requested screenshot pixels.
+- **Website content:** DOM structure/CSS selector for the chosen element, page title, user-requested screenshot pixels and temporary preview pixels from Chrome tab sharing.
 - **User activity:** user choices such as selecting an element and saving window geometry. Pointer events during selection are processed in memory; no activity log or behavioral analytics is created.
 
 Do not claim that the extension handles no user data merely because processing is local. Screenshots or chosen content may contain sensitive information displayed by a website; there is no dedicated extraction of credentials, financial, medical or private-message data.

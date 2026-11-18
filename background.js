@@ -75,22 +75,52 @@ async function detach(tab, message) {
   }
 }
 
-async function toggleVideoPin(tabId, selector, frameRoots) {
-  const args = [selector, frameRoots];
+async function toggleVideoPin(tabId, selector) {
+  const request = crypto.randomUUID();
+  const prepared = await chrome.scripting.executeScript({
+    target: {tabId, allFrames: true}, args: [request, selector, true], func: routeVideoPinFrame
+  });
+  const top = prepared.find(frame => frame.frameId === 0 && frame.result);
+  if (!top) return {found: false};
+  const children = prepared.filter(frame => frame.frameId !== 0 && frame.result);
+  const documentIds = [top.documentId];
+  if (children.length) {
+    const links = await chrome.scripting.executeScript({
+      target: {tabId, allFrames: true}, args: [request, selector, false], func: routeVideoPinFrame
+    });
+    const parentByDocument = new Map(links.map(frame => [frame.documentId, frame.result]));
+    const queue = [top.result.id];
+    const childrenByParent = new Map();
+    for (const child of children) {
+      const parentId = parentByDocument.get(child.documentId);
+      if (!parentId) continue;
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+      childrenByParent.get(parentId).push(child);
+    }
+    const seen = new Set(documentIds);
+    while (queue.length) {
+      for (const child of childrenByParent.get(queue.pop()) || []) {
+        if (seen.has(child.documentId)) continue;
+        seen.add(child.documentId);
+        documentIds.push(child.documentId);
+        queue.push(child.result.id);
+      }
+    }
+  }
   const frames = await chrome.scripting.executeScript({
-    target: {tabId, allFrames: true}, args, func: videoPinFrame
+    target: {tabId, documentIds}, args: [selector], func: videoPinFrame
   });
   const candidate = frames.filter(frame => frame.result).sort((a, b) =>
     Number(b.result.active) - Number(a.result.active) ||
     Number(b.result.playing) - Number(a.result.playing) || b.result.area - a.result.area
   )[0];
-  if (!candidate) throw new Error(t('pipNoVideo'));
+  if (!candidate) return {found: false};
   const [result] = await chrome.scripting.executeScript({
-    target: {tabId, documentIds: [candidate.documentId]}, args: [...args, true], func: videoPinFrame
+    target: {tabId, documentIds: [candidate.documentId]}, args: [selector, true], func: videoPinFrame
   });
   if (result?.result?.error) throw new Error(t(result.result.error));
   if (!result?.result) throw new Error(t('pipBlocked'));
-  return result.result;
+  return {found: true, active: result.result.active};
 }
 
 async function handle(message, sender) {
@@ -110,8 +140,8 @@ async function handle(message, sender) {
       return;
     }
     case 'video-pin': {
-      if (!state || sender.frameId !== 0 || typeof message.selector !== 'string' || message.selector.length > 12000 || !Array.isArray(message.frameRoots) || !message.frameRoots.every(root => typeof root === 'string' && /^\d+$/.test(root))) throw new Error(t('detachFirst'));
-      return toggleVideoPin(tabId, message.selector, message.frameRoots);
+      if (!state || sender.frameId !== 0 || typeof message.selector !== 'string' || message.selector.length > 12000) throw new Error(t('detachFirst'));
+      return toggleVideoPin(tabId, message.selector);
     }
     case 'pip-state':
       if (sender.tab) await chrome.tabs.sendMessage(tabId, {type: 'pip-state', active: false}, {frameId: 0}).catch(() => {});

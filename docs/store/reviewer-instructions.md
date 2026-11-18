@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.3
+# Reviewer instructions — Separate Window 1.4.4
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -10,7 +10,7 @@ The publisher is Mycelium; support: qobuz43@gmail.com.
 5. Use the star to create a bookmark in “Separate windows”. Its link reopens the saved element when the extension is installed. Regular later visits show a small reopen button.
 6. Use “Back to tab” to restore the original page without reloading. Native popup close instead recovers the page by loading it in a normal tab; live JS/media state is not guaranteed in that case.
 7. A cross-origin iframe is selected as a whole. Selection intercepts pointer events instead of toggling the player's play/pause controls.
-8. Start a video and use “Always on top” in the hover toolbar. Chrome displays that video in a separate picture-in-picture window without reloading the source player, including nested cross-origin frames. Press “Return video” or close PiP to return it. Site controls/subtitles may not appear, and some players prohibit PiP. Images and arbitrary widgets do not support this mode. No external component or additional permission is required.
+8. Start a video and use “Always on top” in the hover toolbar. Chrome opens the video in its built-in picture-in-picture player, including nested cross-origin frames inside closed web components. Press “Unpin” or close the floating window to return to the player. Site controls and subtitles may be unavailable, and some players prohibit PiP.
 
 9. Change Language in the extension menu using the RU / EN buttons (browser language is the initial default). Verify that the popup, existing picker/toolbar, tooltips, messages and context menu update without reloading the page, and the preference survives reopening the menu.
 
@@ -23,4 +23,4 @@ Run `python tests/smoke.py` for the isolated Chromium test. Run `python tools/st
 
 11. Check the full-size toolbar icon. In the popup, “Rate us” opens Chrome Web Store reviews. “Report a bug” and “Suggest a feature” open separate localized GitHub issue drafts containing the extension version. The user submits them manually. No active page address or content is attached. An email link is also available. `python tests/popup.py` checks both locales, layout, destinations and icon sizes.
 
-12. Run `python tests/pip.py` to exercise “Always on top” in nested frames and in a video inside a closed web component. The test also checks that a video outside the selected block stays in place.
+12. On an HTTPS page, use “Always on top” with a widget or image. Choose “This tab” in Chrome’s sharing dialog. Click “Open preview” if Chrome requires another interaction. The floating preview updates while you use the original widget. Closing it stops sharing. On Windows, use Chrome 156 or later. `python tests/pip.py --chrome` checks live pixel updates, capture cleanup, and nested video players in installed Chrome. `python tests/pip.py` exercises the video scenarios in bundled Chromium.

@@ -1,26 +1,92 @@
 // Serialized by scripting.executeScript into the extension's isolated world.
-async function videoPinFrame(selector, roots, toggle = false) {
-  // These WindowProxy properties are available even across origins.
-  const path = [];
-  for (let win = window; win !== win.top; win = win.parent) {
-    let index = 0;
-    while (index < win.parent.length && win.parent[index] !== win) index++;
-    path.unshift(index);
+function routeVideoPinFrame(request, selector, prepare) {
+  const channel = 'separate-window:video-frame';
+  if (prepare) {
+    const scope = window === window.top ? document.querySelector(selector) : document.documentElement;
+    if (!scope) return null;
+    const id = crypto.randomUUID();
+    const controller = new AbortController();
+    globalThis.__swVideoRoute?.controller.abort();
+    globalThis.__swVideoRoute = {request, id, controller};
+    setTimeout(() => controller.abort(), 2500);
+
+    // Indexes from window.frames omit iframes in shadow trees. Match the
+    // browser-provided source window to the actual iframe in this DOM branch.
+    let children;
+    function childWindows() {
+      const windows = new Set();
+      const bounds = scope.getBoundingClientRect();
+      const minimumArea = Math.min(innerWidth, bounds.width) *
+        (window === window.top ? Math.min(innerHeight, bounds.height) : innerHeight) / 2;
+      const pending = [scope];
+      while (pending.length) {
+        const node = pending.pop();
+        if (node.matches('iframe,frame')) {
+          const rect = node.getBoundingClientRect();
+          if (node.contentWindow && rect.width > 0 && rect.height > 0 &&
+              rect.width * rect.height >= minimumArea && getComputedStyle(node).visibility === 'visible') {
+            windows.add(node.contentWindow);
+          }
+          continue;
+        }
+        const shadow = node instanceof HTMLElement && (node.shadowRoot || chrome.dom?.openOrClosedShadowRoot(node));
+        for (const child of node.children) pending.push(child);
+        if (shadow) for (const child of shadow.children) pending.push(child);
+      }
+      return windows;
+    }
+
+    window.addEventListener('message', event => {
+      const data = event.data;
+      if (!event.isTrusted || !event.source || data?.channel !== channel || data.request !== request ||
+          data.kind !== 'link' || typeof data.id !== 'string') return;
+      children ??= childWindows();
+      event.source.postMessage({channel, request, kind: 'parent', id: data.id,
+        parentId: children.has(event.source) ? id : null}, event.origin === 'null' ? '*' : event.origin);
+    }, {signal: controller.signal});
+    return {id};
   }
-  const key = path.join('.');
-  const inSelection = !path.length || roots.some(root => key === root || key.startsWith(root + '.'));
-  const scope = inSelection && (path.length ? document.documentElement : document.querySelector(selector));
+
+  const route = globalThis.__swVideoRoute;
+  if (window === window.top || route?.request !== request || route.controller.signal.aborted) return null;
+  const {id} = route;
+  return new Promise(resolve => {
+    const listener = new AbortController();
+    const timer = setTimeout(() => finish(null), 500);
+    function finish(parentId) {
+      clearTimeout(timer);
+      listener.abort();
+      resolve(parentId);
+    }
+    window.addEventListener('message', event => {
+      const data = event.data;
+      if (event.isTrusted && event.source === window.parent && data?.channel === channel &&
+          data.request === request && data.kind === 'parent' && data.id === id) {
+        finish(typeof data.parentId === 'string' ? data.parentId : null);
+      }
+    }, {signal: listener.signal});
+    window.parent.postMessage({channel, request, kind: 'link', id}, '*');
+  });
+}
+
+async function videoPinFrame(selector, toggle = false) {
+  const scope = window === window.top ? document.querySelector(selector) : document.documentElement;
   const candidates = [];
   if (scope) {
+    const bounds = scope.getBoundingClientRect();
+    // A small embedded clip should not replace a dashboard or a larger block.
+    const minimumArea = Math.min(innerWidth, bounds.width) *
+      (window === window.top ? Math.min(innerHeight, bounds.height) : innerHeight) / 2;
     const pending = [scope];
     while (pending.length) {
       const node = pending.pop();
       if (node instanceof HTMLVideoElement) {
         const rect = node.getBoundingClientRect();
         const active = node.getRootNode().pictureInPictureElement === node;
-        if (active || (node.videoWidth && node.readyState && rect.width > 0 && rect.height > 0 &&
+        const area = rect.width * rect.height;
+        if (active || (node.videoWidth && node.readyState && area > 0 && area >= minimumArea &&
             getComputedStyle(node).visibility === 'visible')) {
-          candidates.push({video: node, active, playing: !node.paused && !node.ended, area: rect.width * rect.height});
+          candidates.push({video: node, active, playing: !node.paused && !node.ended, area});
         }
         continue;
       }

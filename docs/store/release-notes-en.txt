@@ -1,1 +1,1 @@
-Always on top now finds videos inside embedded players and web components. The app icon is larger on the taskbar.
+Always on top now supports nested video players inside closed web components. For widgets, images and dashboards, share the current tab in Chrome to open a live floating preview.
