@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     manifest=json.loads((ROOT/'manifest.json').read_text(encoding='utf-8'))
     for size, filename in manifest['action']['default_icon'].items():
-        with Image.open(ROOT/filename) as image, Image.open(ROOT/manifest['icons'][size]) as store:
+        with Image.open(ROOT/filename) as image, Image.open(ROOT/f'icons/icon{size}.png') as store:
             assert image.size==(int(size),int(size)) and image.mode=='RGBA'
             def width(im):
                 bounds=im.getchannel('A').point(lambda alpha:255 if alpha>=128 else 0).getbbox()

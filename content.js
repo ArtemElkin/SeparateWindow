@@ -233,7 +233,7 @@
       button.title = button.textContent; button.setAttribute('aria-label', button.title);
     });
     pinButton = button(t('pin'), t('pinTitle'), async () => {
-      const result = await send('video-pin', {selector, frameRoots: mediaFrameRoots()});
+      const result = await send('video-pin', {selector: `[${targetAttr}]`, frameRoots: mediaFrameRoots()});
       setPinState(result.active);
     });
     setPinState(pipActive);

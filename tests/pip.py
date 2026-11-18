@@ -19,6 +19,12 @@ class PipHandler(Handler):
             '/pip': f'''<style>body{{margin:0}}video{{width:900px;height:500px}}iframe{{width:500px;height:300px}}</style>
                 <video id="decoy" autoplay muted></video><section id="empty">No video</section>
                 <iframe id="player" src="http://localhost:{port}/nested"></iframe>''' + STREAM,
+            '/shadow': '''<style>body{margin:0}#shadow-player{width:640px;height:360px}</style>
+                <div id="shadow-player"></div><video id="decoy" autoplay muted></video>''' + STREAM + '''
+                <script>const root = document.querySelector('#shadow-player').attachShadow({mode: 'closed'});
+                root.innerHTML = '<video style="width:100%;height:100%" autoplay muted></video>';
+                window.selectedVideo = root.querySelector('video');
+                selectedVideo.srcObject = document.querySelector('#decoy').srcObject;</script>''',
             '/nested': f'''<style>body{{margin:0}}iframe{{width:100%;height:100%;border:0}}</style>
                 <iframe src="http://127.0.0.1:{port}/video"></iframe><button id="frame-panel" style="position:fixed;top:0">Season</button>''',
             '/video': '<style>body{margin:0}video{width:100%;height:100%}#player-panel{position:fixed;inset:0;background:#0004}</style><video autoplay muted controls></video><div id="player-panel"><select><option>Season 6</option></select><button>Next episode</button></div>' + STREAM,
@@ -124,6 +130,24 @@ def main():
                 assert not page.evaluate('!!document.pictureInPictureElement')
                 assert not video_frame.evaluate('!!document.pictureInPictureElement')
                 print('PASS: an empty selected block does not pin unrelated videos', flush=True)
+
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await restore(tab.id)}''', url)
+                shadow_url = url.replace('/pip', '/shadow')
+                page.goto(shadow_url)
+                page.wait_for_function('selectedVideo.readyState >= 2 && selectedVideo.currentTime > 0')
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await tell(tab.id,'select')}''', shadow_url)
+                page.mouse.click(120, 120)
+                page.wait_for_function('document.querySelector("#shadow-player").getAttributeNames().some(x=>x.endsWith("-target"))')
+                page.locator('#shadow-player').evaluate("(player) => {player.style.width = '640px'; player.style.height = '360px'; player.id = 'updated-player'}")
+                button('pinTitle')
+                page.wait_for_timeout(300)
+                notice = node_with('role', 'status')
+                assert not notice, json.dumps(notice, ensure_ascii=True)
+                page.wait_for_function('selectedVideo.getRootNode().pictureInPictureElement === selectedVideo', timeout=5000)
+                button('unpinTitle')
+                page.wait_for_function('!document.pictureInPictureElement', timeout=5000)
+                print('PASS: video in a closed player root opens and closes in PiP', flush=True)
+
             finally:
                 context.close()
     finally:

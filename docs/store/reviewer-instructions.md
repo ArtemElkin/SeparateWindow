@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.2
+# Reviewer instructions — Separate Window 1.4.3
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -22,3 +22,5 @@ Source and reproducible automation: https://github.com/MerlinRus/SeparateWindow
 Run `python tests/smoke.py` for the isolated Chromium test. Run `python tools/store_assets.py` to reproduce the listing images. Build with `python tools/package.py`.
 
 11. Check the full-size toolbar icon. In the popup, “Rate us” opens Chrome Web Store reviews. “Report a bug” and “Suggest a feature” open separate localized GitHub issue drafts containing the extension version. The user submits them manually. No active page address or content is attached. An email link is also available. `python tests/popup.py` checks both locales, layout, destinations and icon sizes.
+
+12. Run `python tests/pip.py` to exercise “Always on top” in nested frames and in a video inside a closed web component. The test also checks that a video outside the selected block stays in place.

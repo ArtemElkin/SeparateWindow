@@ -14,13 +14,18 @@ with sync_playwright() as p, tempfile.TemporaryDirectory() as temp:
     raw = Path(temp) / 'master.png'
     page.screenshot(path=str(raw), omit_background=True)
     source = Image.open(raw).convert('RGBA')
-    if '--toolbar-only' not in sys.argv:
+    if not {'--toolbar-only', '--app-only'}.intersection(sys.argv):
         for size in (16, 32, 48, 128, 256, 512):
             source.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/icon{size}.png')
-        source.save(ROOT / 'icons/favicon.ico', sizes=[(16,16), (32,32), (48,48)])
-    # Toolbar icons use the full canvas; store icons retain their required padding.
-    toolbar = source.crop((64, 64, 448, 448))
-    for size in (16, 32, 48):
-        toolbar.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/action{size}.png')
+    mark = source.crop((64, 64, 448, 448))
+    if '--app-only' not in sys.argv:
+        for size in (16, 32, 48):
+            mark.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/action{size}.png')
+    if '--toolbar-only' not in sys.argv:
+        for size in (64, 256):
+            mark.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f'icons/app{size}.png')
+        sizes = [(size, size) for size in (16, 24, 32, 48, 64, 128, 256)]
+        for path in ('icons/favicon.ico', 'docs/favicon.ico'):
+            mark.save(ROOT / path, sizes=sizes)
     browser.close()
-print('Rendered toolbar icons: 16, 32, 48' if '--toolbar-only' in sys.argv else 'Rendered toolbar/store icons and favicon.ico')
+print('Rendered toolbar icons: 16, 32, 48' if '--toolbar-only' in sys.argv else 'Rendered app icons and favicon.ico')

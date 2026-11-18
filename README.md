@@ -4,7 +4,7 @@
 
 ![Separate Window](icons/icon128.png)
 
-Материалы и инструкция публикации: [docs/store/README.md](docs/store/README.md). Сборка чистого ZIP для Chrome Web Store: `python tools/package.py`; результат — `dist/separate-window-1.4.2.zip`. Отдельный архив с изображениями и текстами — `dist/chrome-web-store-materials-1.4.2.zip`.
+Материалы и инструкция публикации: [docs/store/README.md](docs/store/README.md). Команда `python tools/package.py` собирает `dist/separate-window-1.4.3.zip` для Chrome Web Store и отдельный архив с изображениями и текстами `dist/chrome-web-store-materials-1.4.3.zip`.
 
 Издатель: **Mycelium**. Поддержка: **qobuz43@gmail.com**. [Политика конфиденциальности](https://merlinrus.github.io/SeparateWindow/privacy.html).
 
@@ -110,7 +110,7 @@ python tests/dashboard.py
 
 Глобальный проморолик с реальными действиями расширения: `docs/store/videos/global-promo-1.4.0.mp4`. Монтаж, сборка и текст для YouTube описаны в [docs/store/promo-video.md](docs/store/promo-video.md).
 
-Исходный знак — `icons/mark.svg`. PNG 16/32/48/128 для Chrome, 256/512 для презентаций и favicon.ico генерируются командой `python tools/build_icons.py`. Иконка 128×128 имеет номинальный прозрачный отступ 16 px.
+Исходный знак — `icons/mark.svg`. Команда `python tools/build_icons.py` генерирует PNG для Chrome и ICO для ярлыков Windows. Иконка 128×128 для магазина имеет прозрачный отступ 16 px.
 
 `python tools/marketing_assets.py` снимает реальную работу расширения на собственной демо-странице и создаёт пошаговые галереи: RU, EN и глобальную, по четыре PNG 1280×800. Первые три кадра показывают открытие меню, выбор плеера на странице с баннерами и отдельное окно с тем же видео. Четвёртый кадр показывает работающий калькулятор, вынесенный со страницы. `tools/store_assets.py` и `tools/global_assets.py` вызывают тот же генератор. Рекламные изображения 440×280 и 1400×560 хранятся отдельно в `docs/store/assets`. `python tools/verify_release.py` проверяет комплект и загрузку упакованной версии в Chromium. Для генерации нужны Python, Pillow и Playwright; в runtime-ZIP они не входят.
 
@@ -118,4 +118,4 @@ python tests/dashboard.py
 
 В меню доступны «Оценить нас» (отзывы Chrome Web Store), «Сообщить о баге» и «Предложить идею» (черновики GitHub Issues с версией расширения и подсказками RU/EN). Адрес текущей страницы и её содержимое автоматически не прикладываются. Пользователь проверяет текст и сам отправляет обращение. Рядом указан email qobuz43@gmail.com. Для GitHub нужен аккаунт; email доступен отдельно.
 
-Значки панели Chrome `icons/action16.png`, `action32.png`, `action48.png` заполняют холст; иконки магазина сохраняют стандартные прозрачные поля. Сборка только значков панели: `python tools/build_icons.py --toolbar-only`.
+Значок приложения заполняет весь холст. `python tools/build_icons.py --app-only` обновляет `icons/favicon.ico` и дополнительные размеры PNG для приложения. `python tools/build_icons.py --toolbar-only` обновляет значки 16, 32 и 48 для панели Chrome.

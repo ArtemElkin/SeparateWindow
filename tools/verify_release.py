@@ -25,6 +25,9 @@ for size, path in manifest['icons'].items():
     with Image.open(ROOT / path) as image:
         assert image.size == (int(size),int(size)) and image.mode == 'RGBA'
         assert image.getpixel((0,0))[3] == 0
+        if size != '128':
+            bounds = image.getchannel('A').point(lambda alpha: 255 if alpha >= 128 else 0).getbbox()
+            assert bounds == (0, 0, int(size), int(size)), path
 assets = ROOT / 'docs/store/assets'
 for path in assets.glob('screenshot-*.png'):
     with Image.open(path) as image:
@@ -39,11 +42,15 @@ for size in ((440,280),(1400,560)):
     with Image.open(assets/f'promo-{size[0]}x{size[1]}.png') as image:
         assert image.size == size and image.mode == 'RGB'
 with Image.open(ROOT/'icons/favicon.ico') as image:
-    assert {(16,16),(32,32),(48,48)}.issubset(image.ico.sizes())
+    assert {(size, size) for size in (16, 24, 32, 48, 64, 128, 256)} == image.ico.sizes()
+    for size in image.ico.sizes():
+        alpha = image.ico.getimage(size).getchannel('A')
+        assert alpha.point(lambda value: 255 if value >= 128 else 0).getbbox() == (0, 0, *size)
+assert (ROOT/'icons/favicon.ico').read_bytes() == (ROOT/'docs/favicon.ico').read_bytes()
 package = ROOT/f'dist/separate-window-{manifest["version"]}.zip'
 with tempfile.TemporaryDirectory(prefix='sw-package-') as temp, zipfile.ZipFile(package) as archive:
     assert archive.testzip() is None
-    for path in manifest['action']['default_icon'].values():
+    for path in [*manifest['action']['default_icon'].values(), 'icons/favicon.ico']:
         assert path in archive.namelist(), path
     extracted = Path(temp)/'extension'
     archive.extractall(extracted)

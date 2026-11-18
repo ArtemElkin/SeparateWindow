@@ -1,1 +1,1 @@
-Larger toolbar icon, RU / EN language buttons, a Rate us link and a Feedback section for bug reports, feature suggestions and email support.
+Always on top now finds videos inside embedded players and web components. The app icon is larger on the taskbar.

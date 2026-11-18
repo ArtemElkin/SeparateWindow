@@ -1,4 +1,58 @@
 // Serialized by scripting.executeScript into the extension's isolated world.
+async function videoPinFrame(selector, roots, toggle = false) {
+  // These WindowProxy properties are available even across origins.
+  const path = [];
+  for (let win = window; win !== win.top; win = win.parent) {
+    let index = 0;
+    while (index < win.parent.length && win.parent[index] !== win) index++;
+    path.unshift(index);
+  }
+  const key = path.join('.');
+  const inSelection = !path.length || roots.some(root => key === root || key.startsWith(root + '.'));
+  const scope = inSelection && (path.length ? document.documentElement : document.querySelector(selector));
+  const candidates = [];
+  if (scope) {
+    const pending = [scope];
+    while (pending.length) {
+      const node = pending.pop();
+      if (node instanceof HTMLVideoElement) {
+        const rect = node.getBoundingClientRect();
+        const active = node.getRootNode().pictureInPictureElement === node;
+        if (active || (node.videoWidth && node.readyState && rect.width > 0 && rect.height > 0 &&
+            getComputedStyle(node).visibility === 'visible')) {
+          candidates.push({video: node, active, playing: !node.paused && !node.ended, area: rect.width * rect.height});
+        }
+        continue;
+      }
+      for (const child of node.children) pending.push(child);
+      if (node instanceof HTMLElement) {
+        const shadow = node.shadowRoot || chrome.dom?.openOrClosedShadowRoot(node);
+        if (shadow) for (const child of shadow.children) pending.push(child);
+      }
+    }
+  }
+  const candidate = candidates.sort((a, b) =>
+    Number(b.active) - Number(a.active) || Number(b.playing) - Number(a.playing) || b.area - a.area
+  )[0];
+  if (!candidate) return toggle ? {error: 'pipNoVideo'} : null;
+  const {video, active, playing, area} = candidate;
+  if (!toggle) return {active, playing, area};
+  try {
+    if (active) {
+      await document.exitPictureInPicture();
+      return {active: false};
+    }
+    if (!document.pictureInPictureEnabled || video.disablePictureInPicture) return {error: 'pipBlocked'};
+    await video.requestPictureInPicture();
+    video.addEventListener('leavepictureinpicture', () => {
+      chrome.runtime.sendMessage({type: 'pip-state', active: false}).catch(() => {});
+    }, {once: true});
+    return {active: true};
+  } catch {
+    return {error: 'pipBlocked'};
+  }
+}
+
 function cleanMediaFrame(selector, roots, enabled, mediaPaths = []) {
   if (enabled !== 'probe') {globalThis.__swCleanMedia?.(); delete globalThis.__swCleanMedia;}
   if (!enabled) return;
