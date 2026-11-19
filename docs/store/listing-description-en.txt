@@ -7,7 +7,7 @@ Features:
 - Show only the selected element; temporarily hide surrounding page decoration.
 - Translucent controls appear over the content when you hover over their area.
 - The semi-transparent “Open in a separate window” button appears only when you hover over a saved element, keeping the page visible underneath.
-- Video-only mode hides player panels; “Show player” restores site controls without reloading. Also supports accessible HTML video inside nested frames.
+- Use the site's playback controls, timeline and quality settings in the separate window. Choose “Video only” to hide panels on compatible players, then “Show player” to restore them without reloading.
 - “Always on top” opens videos from nested players in Chrome picture-in-picture. To keep a widget or another block in view, share the current tab for a live preview. Interact with the block in its original window.
 - Return the live page to a regular tab with “Back to tab”.
 - Recover the page as a regular tab after closing the popup with its native close button.

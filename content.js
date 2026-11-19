@@ -21,10 +21,19 @@
   const token = `sw-${crypto.randomUUID().replaceAll('-', '')}`;
   const targetAttr = `data-${token}-target`;
   const ancestorAttr = `data-${token}-ancestor`;
+  const playerControlsAttr = `data-${token}-player-controls`;
   let selected, selector, sourceUrl, initialSize, cropStyle, ui, shadow, picker;
   let ancestors = [], ancestorLayout = [], cropObserver, scale = 1, rotation = 0, brightness = 1, fit = true;
-  let marker, markerTarget, markerEvents, savedSelector, noticeTimer, detached = false, pinButton, pipActive = false, cleanVideo = true;
+  let marker, markerTarget, markerEvents, savedSelector, noticeTimer, detached = false, pinButton, pipActive = false, cleanVideo = false;
   let blockPreview;
+  let playerControls;
+  const playerContainers = [
+    '#movie_player', '.html5-video-player', 'vk-video-player', '.vp-player',
+    '.video-player', '.dmp_Player', '.video-js', '.jwplayer', '.plyr--video',
+    '.shaka-video-container', 'media-player', 'mux-player'
+  ];
+  if (location.hostname === 'player.vimeo.com') playerContainers.push('#player');
+  const playerSelector = playerContainers.join(',');
 
   async function send(type, extra = {}) {
     const result = await chrome.runtime.sendMessage({type, ...extra});
@@ -92,6 +101,42 @@
     if (previousFocus?.isConnected) previousFocus.focus({preventScroll: true});
   }
 
+  function playerTarget(element) {
+    const player = element.closest(playerSelector);
+    if (player && player.getClientRects().length) return player;
+    if (element.closest('#player-controls')) {
+      const youtube = document.querySelector('#movie_player.html5-video-player');
+      if (youtube?.getClientRects().length) return youtube;
+    }
+    if (!element.matches('video') || element.controls) return element;
+    // Prefer a compact custom player with sibling controls over its raw video.
+    const video = element.getBoundingClientRect();
+    if (!video.width || !video.height) return element;
+    for (let parent = element.parentElement, depth = 0; parent && depth < 4; parent = parent.parentElement, depth++) {
+      if (parent.matches('body,html')) break;
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > video.width * 1.25 || rect.height > video.height * 1.35) break;
+      const videos = parent.querySelectorAll('video');
+      if (videos.length !== 1) break;
+      if (parent.querySelector('button,[role="slider"],input[type="range"]')) return parent;
+    }
+    return element;
+  }
+
+  function consumePickerDoubleClick(element) {
+    // A click just after picking can still belong to Chromium's picker click sequence.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 500);
+    window.addEventListener('dblclick', event => {
+      if (!event.isTrusted || selected !== element ||
+          (!element.contains(event.target) && !playerControls?.contains(event.target))) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      clearTimeout(timeout);
+      controller.abort();
+    }, {capture: true, signal: controller.signal});
+  }
+
   function startPicker() {
     if (selected) return;
     stopPicker(); removeMarker();
@@ -119,10 +164,13 @@
       // elementFromPoint selects an iframe as a whole, preserving its live document.
       let element = document.elementsFromPoint(event.clientX, event.clientY).find(element => element !== host);
       if (!element || element === document.documentElement) return;
-      if (element === picker.chain[0]) return;
+      if (element === picker.hit) return;
+      picker.hit = element;
+      const suggested = playerTarget(element);
+      if (!suggested.contains(element)) element = suggested;
       picker.chain = [];
       while (element && element !== document.documentElement) {picker.chain.push(element); element = element.parentElement;}
-      picker.index = 0; draw();
+      picker.index = Math.max(0, picker.chain.indexOf(suggested)); draw();
     }
     document.addEventListener('pointermove', hover, options);
     for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'dblclick', 'contextmenu']) {
@@ -144,7 +192,12 @@
       event.preventDefault(); event.stopImmediatePropagation();
       const element = picker.chain[picker.index];
       stopPicker();
-      if (element) openElement(element).catch(error => notify(error.message));
+      if (element) {
+        if (element.matches(playerSelector) || element.matches('video') || element.querySelector('video')) {
+          consumePickerDoubleClick(element);
+        }
+        openElement(element, true).catch(error => notify(error.message));
+      }
     }, options);
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {event.preventDefault(); event.stopImmediatePropagation(); stopPicker();}
@@ -160,6 +213,8 @@
     const rotated = rotation % 180 !== 0;
     const factor = fit ? Math.min(availableW / (rotated ? h : w), availableH / (rotated ? w : h)) * scale : scale;
     const target = `[${targetAttr}]`, ancestor = `[${ancestorAttr}]`, host = `[data-${token}-ui]`;
+    const controls = `[${playerControlsAttr}]`;
+    const transform = `translate(-50%,-50%) rotate(${rotation}deg) scale(${factor})`;
     // Dashboard renderers measure their parents. display:contents gives those
     // parents a zero-sized box and can make the site unmount the selected panel.
     const layout = initialSize.media ? '' : ancestorLayout.map((box, index) =>
@@ -170,8 +225,10 @@
       ${ancestor}{display:contents!important;position:static!important;margin:0!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;outline:0!important;transform:none!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;filter:none!important;backdrop-filter:none!important;perspective:none!important;contain:none!important;container-type:normal!important;content-visibility:visible!important;clip:auto!important;clip-path:none!important;overflow:visible!important;opacity:1!important;isolation:auto!important;mix-blend-mode:normal!important;will-change:auto!important}
       ${ancestor}::before,${ancestor}::after{content:none!important;display:none!important}
       html${ancestor}{display:block!important;background:#000!important}
-      ${ancestor} > :not(${ancestor}):not(${target}):not(${host}):not(style):not(script):not(link){display:none!important}
-      ${target}{display:${initialSize.display}!important;position:fixed!important;inset:auto!important;left:50%!important;top:50%!important;width:${w}px!important;height:${h}px!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;z-index:2147483640!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;transform:translate(-50%,-50%) rotate(${rotation}deg) scale(${factor})!important;transform-origin:center!important;filter:brightness(${brightness})!important;box-sizing:border-box!important;visibility:visible!important;}
+      ${ancestor} > :not(${ancestor}):not(${target}):not(${controls}):not(${host}):not(style):not(script):not(link){display:none!important}
+      ${target}{display:${initialSize.display}!important;position:fixed!important;inset:auto!important;left:50%!important;top:50%!important;width:${w}px!important;height:${h}px!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;z-index:2147483640!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;transform:${transform}!important;transform-origin:center!important;filter:brightness(${brightness})!important;box-sizing:border-box!important;visibility:visible!important;}
+      ${target}:fullscreen{inset:0!important;width:100%!important;height:100%!important;transform:none!important}
+      ${controls}{position:fixed!important;inset:auto!important;left:50%!important;top:50%!important;width:${w}px!important;height:${h}px!important;margin:0!important;max-width:none!important;max-height:none!important;box-sizing:border-box!important;transform:${transform}!important;transform-origin:center!important;z-index:2147483641!important;${cleanVideo ? 'display:none!important' : ''}}
       ${host}{display:block!important}
       ${layout}
     `;
@@ -182,6 +239,7 @@
     closeBlockPreview();
     cropObserver?.disconnect(); cropObserver = null;
     cropStyle?.remove(); cropStyle = null;
+    playerControls?.removeAttribute(playerControlsAttr); playerControls = null;
     selected?.removeAttribute(targetAttr);
     for (const ancestor of ancestors) ancestor.removeAttribute(ancestorAttr);
     ancestors = []; ancestorLayout = []; selected = null; detached = false;
@@ -332,9 +390,9 @@
       return button;
     }
     button(t('returnShort'), t('returnTitle'), () => send('restore'));
-    button(t('showPlayer'), t('showPlayer'), async button => {
+    button(t('onlyVideo'), t('onlyVideo'), async button => {
       const enabled = !cleanVideo;
-      await send('clean-media', {selector, frameRoots: mediaFrameRoots(), enabled});
+      await send('clean-media', {selector: `[${targetAttr}]`, frameRoots: mediaFrameRoots(), enabled});
       cleanVideo = enabled;
       button.textContent = t(enabled ? 'showPlayer' : 'onlyVideo');
       button.title = button.textContent; button.setAttribute('aria-label', button.title);
@@ -386,8 +444,9 @@
     pinButton.setAttribute('aria-pressed', String(active));
   }
 
-  async function openElement(element) {
+  async function openElement(element, exact = false) {
     if (selected) return;
+    if (!exact) element = playerTarget(element);
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) throw new Error(t('hiddenBlock'));
     selector = cssSelector(element); savedSelector = selector; sourceUrl = location.href;
@@ -395,10 +454,11 @@
     selected = element; scale = 1; rotation = 0; brightness = 1; fit = true;
     removeMarker(); selected.setAttribute(targetAttr, '');
     markAncestors();
+    syncPlayerControls();
     cropStyle = document.createElement('style'); document.documentElement.append(cropStyle);
-    cleanVideo = true; toolbar(); renderCrop();
+    cleanVideo = false; toolbar(); renderCrop();
     cropObserver = new MutationObserver(() => {
-      if (selected?.isConnected) return;
+      if (selected?.isConnected) {syncPlayerControls(); return;}
       // Frameworks can replace a panel on refresh. Follow its original selector
       // without reparenting/cloning nodes or reloading the live document.
       const replacement = document.querySelector(selector);
@@ -409,7 +469,7 @@
       selected?.removeAttribute(targetAttr);
       for (const ancestor of ancestors) ancestor.removeAttribute(ancestorAttr);
       selected = replacement; selected.setAttribute(targetAttr, '');
-      markAncestors(); renderCrop();
+      markAncestors(); syncPlayerControls(); renderCrop();
       cropStyle.disabled = false;
       if (blockPreview?.cropped) {
         const preview = blockPreview;
@@ -423,7 +483,6 @@
     cropObserver.observe(document.documentElement, {childList:true, subtree:true});
     try {
       await send('detach', {selector, width: rect.width, height: rect.height}); detached = true;
-      await send('clean-media', {selector, frameRoots: mediaFrameRoots()}).catch(error => notify(error.message));
     }
     catch (error) {unCrop(); throw error;}
   }
@@ -442,6 +501,18 @@
       node.setAttribute(ancestorAttr, String(ancestors.length));
       ancestors.push(node); ancestorLayout.push(box);
     }
+  }
+
+  function syncPlayerControls() {
+    // YouTube can mount its HUD next to the video container as a separate layer.
+    if (!playerControls && !selected?.matches('#movie_player.html5-video-player')) return;
+    const portal = document.getElementById('player-controls');
+    const next = selected?.matches('#movie_player.html5-video-player') && portal &&
+      ancestors.includes(portal.parentElement) ? portal : null;
+    if (next === playerControls) return;
+    playerControls?.removeAttribute(playerControlsAttr);
+    playerControls = next;
+    playerControls?.setAttribute(playerControlsAttr, '');
   }
 
   function mediaFrameRoots() {
@@ -487,7 +558,7 @@
   window.addEventListener('scroll', positionMarker, {passive: true, capture: true});
   document.addEventListener('load', event => {
     if (selected && cleanVideo && event.target.localName === 'iframe' && selected.contains(event.target)) {
-      send('clean-media', {selector, frameRoots: mediaFrameRoots()}).catch(error => notify(error.message));
+      send('clean-media', {selector: `[${targetAttr}]`, frameRoots: mediaFrameRoots()}).catch(error => notify(error.message));
     }
   }, true);
   chrome.runtime.onMessage.addListener((message, sender, respond) => {

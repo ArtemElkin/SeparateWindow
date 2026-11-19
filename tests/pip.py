@@ -49,6 +49,27 @@ class PipHandler(Handler):
                 document.getElementById('nested-host').attachShadow({{mode: 'closed'}}).innerHTML =
                     '<iframe style="width:100%;height:100%;border:0" src="http://127.0.0.1:{port}/video?selected"></iframe>';
                 </script>''',
+            '/player-hud': '''<style>body{margin:0}header{height:24px}#movie_player{position:relative;width:720px;height:405px}
+                #surface,video{width:100%;height:100%}#player-controls{position:absolute;top:24px;width:720px;height:405px;pointer-events:none}
+                #surface-hit{position:absolute;inset:30% 30% 30% 30%;background:none;border:0;pointer-events:auto}
+                #hud{position:absolute;bottom:0;left:0;right:0;background:white;pointer-events:auto}
+                #quality-menu{position:absolute;bottom:30px;right:0;background:white}</style>
+                <header>Page outside the player</header><div id="movie_player" class="html5-video-player">
+                <div id="surface"><video autoplay muted></video></div></div>
+                <div id="player-controls"><button id="surface-hit" aria-label="Play or pause"></button>
+                <div id="hud"><input id="seek" type="range" aria-label="Seek"><button id="settings">Settings</button>
+                <button id="fullscreen">Fullscreen</button></div>
+                <div id="quality-menu" hidden><button id="hd">1080p</button></div></div>''' + STREAM + '''
+                <script>const movie = document.querySelector('#movie_player');
+                const video = movie.querySelector('video');
+                const overlay = document.querySelector('#player-controls');
+                overlay.querySelector('#surface-hit').onclick = () => video.paused ? video.play() : video.pause();
+                overlay.addEventListener('dblclick', () => movie.requestFullscreen());
+                overlay.querySelector('#fullscreen').onclick = () => movie.requestFullscreen();
+                overlay.querySelector('#settings').onclick = () => overlay.querySelector('#quality-menu').hidden = false;
+                overlay.querySelector('#hd').onclick = () => {movie.dataset.quality = '1080p';overlay.querySelector('#quality-menu').hidden = true;};
+                overlay.querySelector('#seek').oninput = e => {movie.dataset.seek = e.target.value;};</script>
+                <style>#quality-menu{pointer-events:auto}</style>''',
             '/video': player,
         }
         if path not in pages:
@@ -169,20 +190,20 @@ def main():
                     page.mouse.click(*rect)
 
                 nested_frame = next(frame for frame in page.frames if frame.url.endswith('/nested'))
-                video_frame.locator('#player-panel').wait_for(state='hidden')
-                assert not nested_frame.locator('#frame-panel').is_visible()
-                assert not video_frame.locator('video').evaluate('(v)=>v.controls')
-                assert page.locator('#player').evaluate('(e)=>getComputedStyle(e).borderTopWidth') == '0px'
-                button('showPlayer')
-                video_frame.locator('#player-panel').wait_for(state='visible')
+                video_frame.locator('#player-panel').wait_for(state='visible', timeout=3000)
                 assert nested_frame.locator('#frame-panel').is_visible()
                 assert video_frame.locator('video').evaluate('(v)=>v.controls')
                 button('onlyVideo')
                 video_frame.locator('#player-panel').wait_for(state='hidden')
+                assert not nested_frame.locator('#frame-panel').is_visible()
                 assert not video_frame.locator('video').evaluate('(v)=>v.controls')
+                assert page.locator('#player').evaluate('(e)=>getComputedStyle(e).borderTopWidth') == '0px'
                 assert video_frame.evaluate('window.identity') == identity
                 page.screenshot(path=str(ROOT/'tests/clean-video.png'))
-                print('PASS: player overlays and native controls hidden across nested frames; reversible without reload', flush=True)
+                button('showPlayer')
+                video_frame.locator('#player-panel').wait_for(state='visible')
+                assert video_frame.locator('video').evaluate('(v)=>v.controls')
+                print('PASS: native controls by default, optional clean video and restoration without reload', flush=True)
                 button('pinTitle')
                 video_frame.wait_for_function('!!document.pictureInPictureElement', timeout=5000)
                 assert not page.evaluate('!!document.pictureInPictureElement'), 'A larger unrelated video must never be selected'
@@ -253,6 +274,36 @@ def main():
                 button('unpinTitle')
                 selected_frame.wait_for_function('!document.pictureInPictureElement')
                 print('PASS: nested cross-origin iframes in closed components pin only the selected video', flush=True)
+
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await restore(tab.id)}''', closed_url)
+                hud_url = url.replace('/pip', '/player-hud')
+                page.goto(hud_url)
+                page.wait_for_function('document.querySelector("video").currentTime > 0')
+                identity = page.evaluate('window.identity')
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await tell(tab.id,'select')}''', hud_url)
+                box = page.locator('video').bounding_box()
+                page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+                page.wait_for_function('document.querySelector("#movie_player").getAttributeNames().some(x=>x.endsWith("-target"))', timeout=5000)
+                assert not page.locator('header').is_visible()
+                assert not page.locator('video').evaluate('(v)=>v.paused'), 'Selection must not pause the player'
+                page.locator('#surface-hit').click()
+                assert page.locator('video').evaluate('(v)=>v.paused'), 'A single click should reach play/pause'
+                assert not page.evaluate('document.fullscreenElement'), 'A single click must not enter fullscreen'
+                page.locator('#settings').click()
+                page.locator('#hd').click()
+                assert page.locator('#movie_player').get_attribute('data-quality') == '1080p'
+                page.locator('#seek').fill('73')
+                assert page.locator('#movie_player').get_attribute('data-seek') == '73'
+                button('onlyVideo')
+                page.locator('#player-controls').wait_for(state='hidden')
+                button('showPlayer')
+                page.locator('#player-controls').wait_for(state='visible')
+                page.locator('#fullscreen').click()
+                page.wait_for_function('document.fullscreenElement?.id === "movie_player"', timeout=5000)
+                assert page.locator('#movie_player').evaluate('(e)=>Math.abs(e.getBoundingClientRect().width - innerWidth)<1')
+                page.evaluate('document.exitFullscreen()')
+                assert page.evaluate('window.identity') == identity
+                print('PASS: player picked from the video surface, settings/seek reachable, single-click pause and explicit fullscreen', flush=True)
 
             finally:
                 close_browser()

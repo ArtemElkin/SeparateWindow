@@ -1,1 +1,1 @@
-Always on top now supports nested video players inside closed web components. For widgets, images and dashboards, share the current tab in Chrome to open a live floating preview.
+Videos open with the original timeline and quality controls. “Video only” hides the panels when you want a clean view. Use the player or extension fullscreen button to go fullscreen.

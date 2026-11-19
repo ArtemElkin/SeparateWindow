@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.4
+# Reviewer instructions — Separate Window 1.4.5
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -10,6 +10,8 @@ The publisher is Mycelium; support: qobuz43@gmail.com.
 5. Use the star to create a bookmark in “Separate windows”. Its link reopens the saved element when the extension is installed. Regular later visits show a small reopen button.
 6. Use “Back to tab” to restore the original page without reloading. Native popup close instead recovers the page by loading it in a normal tab; live JS/media state is not guaranteed in that case.
 7. A cross-origin iframe is selected as a whole. Selection intercepts pointer events instead of toggling the player's play/pause controls.
+
+For a supported player, click the video surface in the picker to select the whole player. After detaching, use its timeline and quality menu, then click the center once to pause or resume. Use the player’s fullscreen button to enter fullscreen. “Video only” and “Show player” toggle between a clean picture and the original controls without reloading.
 8. Start a video and use “Always on top” in the hover toolbar. Chrome opens the video in its built-in picture-in-picture player, including nested cross-origin frames inside closed web components. Press “Unpin” or close the floating window to return to the player. Site controls and subtitles may be unavailable, and some players prohibit PiP.
 
 9. Change Language in the extension menu using the RU / EN buttons (browser language is the initial default). Verify that the popup, existing picker/toolbar, tooltips, messages and context menu update without reloading the page, and the preference survives reopening the menu.
