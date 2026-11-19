@@ -1,3 +1,20 @@
+let selectShortcut;
+
+function renderShortcut() {
+  const keys = document.querySelector('#shortcut-keys');
+  keys.replaceChildren();
+  if (!selectShortcut) {
+    keys.textContent = selectShortcut === '' ? SWI18n.t('shortcutUnassigned') : selectShortcut === null ? '—' : '…';
+    return;
+  }
+  for (const key of selectShortcut.split('+')) {
+    if (keys.children.length) keys.append('+');
+    const cap = document.createElement('kbd');
+    cap.textContent = key;
+    keys.append(cap);
+  }
+}
+
 function render() {
   document.documentElement.lang = SWI18n.language;
   for (const element of document.querySelectorAll('[data-i18n]')) element.textContent = SWI18n.t(element.dataset.i18n);
@@ -5,6 +22,7 @@ function render() {
   for (const button of document.querySelectorAll('[data-language]')) button.setAttribute('aria-pressed', String(button.dataset.language === SWI18n.language));
   const version = chrome.runtime.getManifest().version;
   document.querySelector('#version').textContent = version;
+  renderShortcut();
   for (const [id, title, body] of [['report-bug','bugTitle','bugBody'], ['suggest-feature','featureTitle','featureBody']]) {
     const url = new URL('https://github.com/MerlinRus/SeparateWindow/issues/new');
     url.searchParams.set('title', SWI18n.t(title));
@@ -15,7 +33,11 @@ function render() {
 SWI18n.onChange(old => {
   render(); const status = document.querySelector('#status'); status.textContent = SWI18n.translate(status.textContent, old);
 });
-SWI18n.ready.then(render);
+SWI18n.ready.then(render).catch(error => {document.querySelector('#status').textContent = error.message;});
+chrome.commands.getAll().then(commands => {
+  selectShortcut = commands.find(command => command.name === 'select')?.shortcut || '';
+  renderShortcut();
+}).catch(() => {selectShortcut = null; renderShortcut();});
 for (const language of document.querySelectorAll('[data-language]')) language.addEventListener('click', async () => {
   const buttons = document.querySelectorAll('[data-language]');
   for (const button of buttons) button.disabled = true;

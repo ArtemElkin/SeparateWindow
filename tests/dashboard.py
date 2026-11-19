@@ -93,11 +93,26 @@ def main():
                 png = page.screenshot()
                 image=Image.open(io.BytesIO(png)).convert('RGB')
                 assert image.getpixel((400,200)) != (0,0,0), 'Panel must actually paint, not merely have a DOM box'
+                page.evaluate('''() => {
+                  const slot = document.createElement('div');
+                  slot.id = 'new-slot';
+                  slot.style.cssText = 'width:600px;height:360px';
+                  document.querySelector('main').append(slot);
+                  slot.append(document.querySelector('#stat'));
+                }''')
+                page.locator('#stat').wait_for(state='visible', timeout=3000)
+                assert page.locator('#new-slot').evaluate('(e)=>e.getAttributeNames().some(n=>n.endsWith("-ancestor"))')
+                page.locator('#value').click()
+                assert page.evaluate('window.identity')==identity
+                page.locator('#stat').evaluate('(e)=>e.remove()')
+                page.locator('header').wait_for(state='visible', timeout=6000)
+                assert page.locator('#outside').is_visible(), 'A removed panel must not leave a black popup'
                 worker.evaluate("""async url=>{const [tab]=await chrome.tabs.query({url});await restore(tab.id);}""", url)
                 assert page.locator('header').is_visible() and page.locator('#outside').is_visible()
                 assert page.locator('#cell').evaluate('(e)=>getComputedStyle(e).containerType')=='inline-size'
-                assert not page.locator('#stat').evaluate('(e)=>e.getAttributeNames().some(n=>n.endsWith("-target"))')
-                print('PASS: measured live panel, updates, clicks, resize, DOM replacement, painted pixels and restore')
+                assert not page.evaluate('''[...document.querySelectorAll('*')].some(
+                    e => e.getAttributeNames().some(n => n.startsWith('data-sw-') && (n.endsWith('-target') || n.endsWith('-ancestor'))))''')
+                print('PASS: live panel resize, replacement, reparenting and recovery after removal')
             finally:
                 context.close()
     finally:

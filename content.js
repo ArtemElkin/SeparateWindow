@@ -22,7 +22,8 @@
   const targetAttr = `data-${token}-target`;
   const ancestorAttr = `data-${token}-ancestor`;
   const playerControlsAttr = `data-${token}-player-controls`;
-  let selected, selector, sourceUrl, initialSize, cropStyle, ui, shadow, picker;
+  let selected, selector, sourceUrl, initialSize, cropStyle, ui, shadow, picker, recoveryTimer;
+  let selectionObserver, selectionTimer, selectionGeneration = 0;
   let ancestors = [], ancestorLayout = [], cropObserver, scale = 1, rotation = 0, brightness = 1, fit = true;
   let marker, markerTarget, markerEvents, savedSelector, noticeTimer, detached = false, pinButton, pipActive = false, cleanVideo = false;
   let blockPreview;
@@ -140,6 +141,7 @@
 
   function startPicker() {
     if (selected) return;
+    stopPendingSelection();
     stopPicker(); removeMarker();
     const previousFocus = document.activeElement;
     const {host, root} = makeUI();
@@ -253,13 +255,15 @@
 
   function unCrop(showMarker = true) {
     stopPicker();
+    stopPendingSelection();
     closeBlockPreview();
     cropObserver?.disconnect(); cropObserver = null;
+    clearTimeout(recoveryTimer); recoveryTimer = null;
     cropStyle?.remove(); cropStyle = null;
     playerControls?.removeAttribute(playerControlsAttr); playerControls = null;
     selected?.removeAttribute(targetAttr);
     for (const ancestor of ancestors) ancestor.removeAttribute(ancestorAttr);
-    ancestors = []; ancestorLayout = []; selected = null; detached = false;
+    ancestors = []; ancestorLayout = []; selected = null; detached = false; pinButton = null; pipActive = false;
     ui?.remove(); ui = null; shadow = null;
     if (showMarker) installMarker(savedSelector);
   }
@@ -327,7 +331,15 @@
       video.muted = true;
       video.srcObject = new MediaStream([preview.track]);
       previewWindow.document.body.append(video);
-      await video.play();
+      let playbackTimer;
+      try {
+        await Promise.race([
+          video.play(),
+          new Promise((_, reject) => {playbackTimer = setTimeout(reject, 8000);})
+        ]);
+      } finally {
+        clearTimeout(playbackTimer);
+      }
       renderPinButton();
     } catch {
       if (blockPreview !== preview) return;
@@ -461,6 +473,25 @@
     pinButton.setAttribute('aria-pressed', String(active));
   }
 
+  function returnWithoutSelection() {
+    if (selected && cleanVideo) {
+      send('clean-media', {selector: `[${targetAttr}]`, frameRoots: [], enabled: false}).catch(() => {});
+    }
+    unCrop(false);
+    detached = true;
+    const {host, root} = makeUI();
+    ui = host; shadow = root;
+    const notice = document.createElement('div');
+    notice.className = 'hint';
+    notice.setAttribute('role', 'status');
+    notice.textContent = t('blockNotFound');
+    const restore = document.createElement('button');
+    restore.textContent = t('returnShort');
+    restore.onclick = () => send('restore').catch(error => notify(error.message));
+    notice.append(restore);
+    root.append(notice);
+  }
+
   async function openElement(element, exact = false) {
     if (selected) return;
     if (!exact) element = playerTarget(element);
@@ -469,17 +500,24 @@
     selector = cssSelector(element); savedSelector = selector; sourceUrl = location.href;
     initialSize = {width: rect.width, height: rect.height, display: getComputedStyle(element).display, media: element.matches('video,iframe,frame')};
     selected = element; scale = 1; rotation = 0; brightness = 1; fit = true;
-    removeMarker(); selected.setAttribute(targetAttr, '');
+    removeMarker(); ui?.remove(); selected.setAttribute(targetAttr, '');
     markAncestors();
     syncPlayerControls();
     cropStyle = document.createElement('style'); document.documentElement.append(cropStyle);
     cleanVideo = false; toolbar(); renderCrop();
     cropObserver = new MutationObserver(() => {
-      if (selected?.isConnected) {syncPlayerControls(); return;}
+      const connected = selected?.isConnected;
+      const sameParents = connected && selected.parentElement === ancestors[0] &&
+        ancestors.every((element, index) => element.parentElement === (ancestors[index + 1] || null));
+      if (sameParents) {syncPlayerControls(); return;}
       // Frameworks can replace a panel on refresh. Follow its original selector
       // without reparenting/cloning nodes or reloading the live document.
-      const replacement = document.querySelector(selector);
-      if (!replacement) return;
+      const replacement = connected ? selected : document.querySelector(selector);
+      if (!replacement) {
+        if (!recoveryTimer) recoveryTimer = setTimeout(returnWithoutSelection, 3000);
+        return;
+      }
+      clearTimeout(recoveryTimer); recoveryTimer = null;
       // The crop hides newly inserted, unmarked ancestors. Measure them with
       // the page's layout restored, then reapply crop before the next paint.
       cropStyle.disabled = true;
@@ -488,6 +526,9 @@
       selected = replacement; selected.setAttribute(targetAttr, '');
       markAncestors(); syncPlayerControls(); renderCrop();
       cropStyle.disabled = false;
+      if (cleanVideo && detached) {
+        send('clean-media', {selector: `[${targetAttr}]`, frameRoots: mediaFrameRoots()}).catch(error => notify(error.message));
+      }
       if (blockPreview?.cropped) {
         const preview = blockPreview;
         cropBlockPreview(preview, replacement).catch(() => {
@@ -588,15 +629,24 @@
       case 'pip-state': setPinState(message.active); break;
       case 'returned': detached = false; installMarker(savedSelector); break;
       case 'forget':
-        chrome.storage.local.remove(`selection:${location.href}`).catch(error => notify(error.message));
+        stopPendingSelection();
         savedSelector = null; removeMarker(); break;
       default: return;
     }
     respond({ok: true});
   });
 
+  function stopPendingSelection() {
+    selectionGeneration++;
+    selectionObserver?.disconnect(); selectionObserver = null;
+    clearTimeout(selectionTimer);
+  }
+
   async function init() {
+    stopPendingSelection();
+    const generation = selectionGeneration;
     const context = await send('window-state');
+    if (generation !== selectionGeneration || selected || picker) return;
     detached = context.detached;
     let automatic = false;
     if (location.hash.startsWith('#__sw_local=')) {
@@ -606,12 +656,16 @@
         savedSelector = data.selector; automatic = true;
         history.replaceState(history.state, '', location.pathname + location.search + data.hash);
       } catch (error) {notify(t('linkError', error.message)); return;}
-    } else {
+    } else if (!context.incognito) {
       const key = `selection:${location.href}`;
       savedSelector = (await chrome.storage.local.get(key))[key]?.selector;
     }
+    if (generation !== selectionGeneration || selected || picker) return;
     if (detached) {savedSelector ||= context.selector; automatic = true;}
-    if (!savedSelector) return;
+    if (!savedSelector) {
+      if (detached) returnWithoutSelection();
+      return;
+    }
     function attempt() {
       let element;
       try {element = document.querySelector(savedSelector);} catch {return true;}
@@ -621,9 +675,15 @@
       return true;
     }
     if (attempt()) return;
-    const observer = new MutationObserver(() => {if (attempt()) observer.disconnect();});
-    observer.observe(document.documentElement, {childList: true, subtree: true});
-    setTimeout(() => {observer.disconnect(); if (automatic && !selected) notify(t('blockNotFound'));}, 15000);
+    selectionObserver = new MutationObserver(() => {if (attempt()) stopPendingSelection();});
+    selectionObserver.observe(document.documentElement, {childList: true, subtree: true});
+    selectionTimer = setTimeout(() => {
+      stopPendingSelection();
+      if (automatic && !selected) {
+        if (detached) returnWithoutSelection();
+        else notify(t('blockNotFound'));
+      }
+    }, 15000);
   }
   window.addEventListener('hashchange', () => {
     if (!selected && location.hash.startsWith('#__sw_local=')) init().catch(error => notify(error.message));

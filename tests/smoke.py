@@ -371,6 +371,24 @@ def main():
             assert len(context.pages) == 1
             assert not errors, errors
             print('PASS: native popup close recovers the latest navigated URL without reopening the popup')
+            page.goto(link)
+            page.locator('header').wait_for(state='hidden')
+            page.goto(url + 'different-path')
+            assert page.locator('header').is_visible(), 'A stale selector must not crop an unrelated page with the same element ID'
+            page.goto(link)
+            page.locator('header').wait_for(state='hidden')
+            identity = page.evaluate('window.identity')
+            worker.evaluate('''async url => {
+              const [tab] = await chrome.tabs.query({url});
+              const key = sessionKey(tab.id);
+              const state = (await chrome.storage.session.get(key))[key];
+              await chrome.tabs.move(tab.id,{windowId:state.originWindowId,index:state.index});
+              await inTabOrder(tab.id,()=>{});
+            }''', url)
+            page.locator('header').wait_for(state='visible', timeout=5000)
+            assert page.evaluate('window.identity') == identity
+            assert not state()['session']
+            print('PASS: unrelated navigation shows the full page, and moving the tab back manually restores live content')
             page.screenshot(path=str(ROOT / 'tests' / 'verified-page.png'))
             print('ALL SMOKE CHECKS PASSED')
         except Exception:

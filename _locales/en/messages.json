@@ -1,4 +1,10 @@
 {
+  "shortcutUnassigned": {
+    "message": "Not assigned"
+  },
+  "privateBounds": {
+    "message": "Window size and position are not saved in Incognito."
+  },
   "extensionDescription": {
     "message": "Open videos, widgets and other page elements in a separate window. No reloads, ads or page clutter."
   },

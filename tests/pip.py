@@ -283,7 +283,11 @@ def main():
                 selected_frame.wait_for_function('!document.pictureInPictureElement')
                 print('PASS: nested cross-origin iframes in closed components pin only the selected video', flush=True)
 
-                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await restore(tab.id)}''', closed_url)
+                button('pinTitle')
+                selected_frame.wait_for_function('!!document.pictureInPictureElement', timeout=5000)
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await toggleSelection(tab.id)}''', closed_url)
+                selected_frame.wait_for_function('!document.pictureInPictureElement', timeout=5000)
+                print('PASS: returning to the tab also closes extension-owned PiP in a nested frame', flush=True)
                 hud_url = url.replace('/pip', '/player-hud')
                 page.goto(hud_url)
                 page.wait_for_function('document.querySelector("video").currentTime > 0')

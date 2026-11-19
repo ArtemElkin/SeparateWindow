@@ -16,6 +16,8 @@ Reads the current page URL/title and tab/window metadata needed to move the exis
 
 Stores the interface language preference, per-page CSS selectors and optional window geometry locally. Uses session storage for the original tab position, tab/window IDs and current URL while detached. No storage.sync or extension server is used.
 
+In Incognito, URLs, chosen elements and window geometry are not saved in persistent settings. Temporary session state allows a detached tab to be returned or recovered.
+
 ### scripting
 
 Injects packaged selection/isolation code into already-open pages when no active content-script listener is available. The user starts selection through the extension button, shortcut or context menu. No remote JavaScript is injected.

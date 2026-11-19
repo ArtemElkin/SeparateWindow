@@ -3,15 +3,42 @@ const t = (key, substitutions) => SWI18n.t(key, substitutions);
 const sessionKey = id => `window:${id}`;
 const selectionKey = url => `selection:${url}`;
 const supported = url => /^(https?|file):/.test(url || '');
+const pageAddress = url => url?.split('#__sw_local=')[0];
+const tabJobs = new Map();
+const preferenceJobs = new Map();
+
+function samePageRoute(first, second) {
+  if (!supported(first) || !supported(second)) return false;
+  try {
+    const a = new URL(first), b = new URL(second);
+    return a.origin === b.origin && a.protocol === b.protocol && a.pathname === b.pathname;
+  } catch {return false;}
+}
+
+function inOrder(jobs, key, task) {
+  const result = (jobs.get(key) || Promise.resolve()).then(task);
+  const tail = result.catch(() => {});
+  jobs.set(key, tail);
+  tail.then(() => {if (jobs.get(key) === tail) jobs.delete(key);});
+  return result;
+}
+const inTabOrder = (tabId, task) => inOrder(tabJobs, tabId, task);
+const inPreferenceOrder = (key, task) => inOrder(preferenceJobs, key, task);
 
 async function tell(tabId, type) {
-  try { return await chrome.tabs.sendMessage(tabId, {type}); }
+  let response;
+  try {response = await chrome.tabs.sendMessage(tabId, {type}, {frameId: 0});}
   catch {
     const tab = await chrome.tabs.get(tabId);
     if (!supported(tab.url)) throw new Error(t('restrictedPage'));
-    await chrome.scripting.executeScript({target: {tabId}, files: ['i18n.js', 'content.js']});
-    return chrome.tabs.sendMessage(tabId, {type});
+    try {
+      await chrome.scripting.executeScript({target: {tabId}, files: ['i18n.js', 'content.js']});
+      response = await chrome.tabs.sendMessage(tabId, {type}, {frameId: 0});
+    } catch {
+      throw new Error(t('restrictedPage'));
+    }
   }
+  if (!response?.ok) throw new Error(response?.error || t('commandFailed'));
 }
 
 async function findOrigin(state) {
@@ -26,52 +53,77 @@ async function removePlaceholder(state) {
   if (!state.placeholderId) return;
   try {
     const placeholder = await chrome.tabs.get(state.placeholderId);
-    if (placeholder.url === 'about:blank') await chrome.tabs.remove(placeholder.id);
+    if (placeholder.windowId === state.originWindowId && !placeholder.pinned &&
+        (!placeholder.pendingUrl || placeholder.pendingUrl === 'about:blank') &&
+        (placeholder.url === 'about:blank' || (!placeholder.url && placeholder.pendingUrl === 'about:blank'))) {
+      await chrome.tabs.remove(placeholder.id);
+    }
   } catch {}
+}
+
+async function moveToNormal(tabId, state) {
+  const origin = await findOrigin(state);
+  if (origin) {
+    await chrome.tabs.move(tabId, {windowId: origin.id, index: state.index});
+    await chrome.tabs.update(tabId, {active: true, pinned: !!state.pinned}).catch(() => {});
+    await chrome.windows.update(origin.id, {focused: true}).catch(() => {});
+  } else {
+    await chrome.windows.create({tabId, type: 'normal', incognito: !!state.incognito, focused: true});
+    if (state.pinned) await chrome.tabs.update(tabId, {pinned: true}).catch(() => {});
+  }
+}
+
+async function finishRestore(tabId, state) {
+  await chrome.scripting.executeScript({target: {tabId, allFrames: true}, func: resetDetachedMedia}).catch(() => {});
+  await tell(tabId, 'uncrop').catch(() => {});
+  if (state) {
+    await removePlaceholder(state);
+    await chrome.storage.session.remove(sessionKey(tabId));
+  }
+  await tell(tabId, 'returned').catch(() => {});
 }
 
 async function restore(tabId) {
   const key = sessionKey(tabId);
   const state = (await chrome.storage.session.get(key))[key];
-  await chrome.scripting.executeScript({target: {tabId, allFrames:true}, func:cleanMediaFrame, args:['', [], false]}).catch(() => {});
-  await tell(tabId, 'uncrop').catch(() => {});
-  if (!state) {await tell(tabId, 'returned').catch(() => {}); return;}
-  const origin = await findOrigin(state);
-  if (origin) {
-    await chrome.tabs.move(tabId, {windowId: origin.id, index: state.index});
-    await chrome.tabs.update(tabId, {active: true});
-    await chrome.windows.update(origin.id, {focused: true});
-  } else {
-    await chrome.windows.create({tabId, type: 'normal', incognito: !!state.incognito, focused: true});
-  }
-  await removePlaceholder(state);
-  await chrome.storage.session.remove(key);
-  await tell(tabId, 'returned').catch(() => {});
+  if (state && (await chrome.tabs.get(tabId)).windowId === state.popupWindowId) await moveToNormal(tabId, state);
+  await finishRestore(tabId, state);
 }
 
-async function detach(tab, message) {
+async function detach(tab, message, documentUrl = tab.url) {
   const key = sessionKey(tab.id);
   if ((await chrome.storage.session.get(key))[key]) return;
-  if (typeof message.selector !== 'string' || message.selector.length > 12000) throw new Error(t('invalidArea'));
-  const pageUrl = tab.url.split('#__sw_local=')[0];
-  const saved = (await chrome.storage.local.get(selectionKey(pageUrl)))[selectionKey(pageUrl)];
-  const state = {originWindowId: tab.windowId, index: tab.index, url: pageUrl, selector: message.selector, incognito: tab.incognito, pinned: tab.pinned};
+  if (typeof message.selector !== 'string' || !message.selector || message.selector.length > 12000) throw new Error(t('invalidArea'));
+  const pageUrl = pageAddress(documentUrl);
+  if (!supported(pageUrl)) throw new Error(t('restrictedPage'));
+  const saved = tab.incognito ? undefined : (await chrome.storage.local.get(selectionKey(pageUrl)).catch(() => ({})))[selectionKey(pageUrl)];
+  const state = {originWindowId: tab.windowId, index: tab.index, url: pageUrl, selectionUrl: pageUrl, selector: message.selector, incognito: tab.incognito, pinned: tab.pinned};
   const tabs = await chrome.tabs.query({windowId: tab.windowId});
   if (tabs.length === 1) state.placeholderId = (await chrome.tabs.create({windowId: tab.windowId, url: 'about:blank', active: false})).id;
   const bounds = saved?.bounds;
-  const options = {tabId: tab.id, type: 'popup', focused: true,
+  const options = {tabId: tab.id, type: 'popup', incognito: !!tab.incognito, focused: true,
     width: Math.max(320, Math.min(2400, Math.round(message.width || 800))),
     height: Math.max(240, Math.min(1600, Math.round((message.height || 500) + 40)))};
-  if (bounds) Object.assign(options, bounds);
+  if (bounds && ['left', 'top', 'width', 'height'].every(field => Number.isSafeInteger(bounds[field])) &&
+      bounds.width > 0 && bounds.height > 0) {
+    for (const field of ['left', 'top', 'width', 'height']) options[field] = bounds[field];
+  }
   try {
     const popup = await chrome.windows.create(options);
     state.popupWindowId = popup.id;
     await chrome.storage.session.set({[key]: state});
-    await chrome.storage.local.set({[selectionKey(pageUrl)]: {...saved, selector: message.selector}});
   } catch (error) {
-    await chrome.storage.session.set({[key]: state});
-    await restore(tab.id);
+    if (state.popupWindowId !== undefined) await moveToNormal(tab.id, state).catch(console.error);
+    await removePlaceholder(state);
     throw error;
+  }
+  // Remembering a selection must not undo a successful move if storage is full.
+  if (!tab.incognito) {
+    const pageKey = selectionKey(pageUrl);
+    await inPreferenceOrder(pageKey, async () => {
+      const latest = (await chrome.storage.local.get(pageKey))[pageKey];
+      await chrome.storage.local.set({[pageKey]: {...latest, selector: message.selector}});
+    }).catch(console.error);
   }
 }
 
@@ -128,9 +180,16 @@ async function handle(message, sender) {
   const extensionPage = !sender.tab && sender.url?.startsWith(chrome.runtime.getURL(''));
   const tabId = sender.tab?.id ?? (extensionPage ? message.tabId : undefined);
   if (!Number.isInteger(tabId)) throw new Error(t('noActiveTab'));
+  if (sender.tab && sender.frameId !== 0 && message.type !== 'pip-state') throw new Error(t('commandFailed'));
+  if (message.type === 'window-state' || message.type === 'pip-state') return handleTab(tabId, message, sender);
+  return inTabOrder(tabId, () => handleTab(tabId, message, sender));
+}
+
+async function handleTab(tabId, message, sender) {
   const tab = await chrome.tabs.get(tabId);
   const key = sessionKey(tabId);
-  const state = (await chrome.storage.session.get(key))[key];
+  const detached = (await chrome.storage.session.get(key))[key];
+  const state = detached?.popupWindowId === tab.windowId ? detached : null;
   switch (message.type) {
     case 'clean-media': {
       if (!state || sender.frameId !== 0 || typeof message.selector !== 'string' || message.selector.length > 12000 || !Array.isArray(message.frameRoots) || !message.frameRoots.every(root => typeof root === 'string' && /^\d+$/.test(root))) throw new Error(t('detachFirst'));
@@ -146,48 +205,68 @@ async function handle(message, sender) {
     case 'pip-state':
       if (sender.tab) await chrome.tabs.sendMessage(tabId, {type: 'pip-state', active: false}, {frameId: 0}).catch(() => {});
       return;
-    case 'window-state': return {detached: !!state && state.popupWindowId === tab.windowId, selector: state?.selector};
+    case 'window-state': {
+      const selectionUrl = state?.selectionUrl || state?.url;
+      const selector = samePageRoute(selectionUrl, sender.url || tab.url) ? state?.selector : undefined;
+      return {detached: !!state, selector, incognito: !!tab.incognito};
+    }
     case 'select':
       if (state) return restore(tabId);
       return tell(tabId, 'select');
     case 'restore': return restore(tabId);
-    case 'forget': return tell(tabId, 'forget');
+    case 'forget':
+      if (!tab.incognito && supported(tab.url)) {
+        const pageKey = selectionKey(pageAddress(tab.url));
+        await inPreferenceOrder(pageKey, () => chrome.storage.local.remove(pageKey));
+      }
+      return tell(tabId, 'forget');
     case 'detach':
       if (!sender.tab) throw new Error(t('selectFirst'));
-      return detach(tab, message);
+      return detach(tab, message, sender.url || tab.url);
     case 'bounds': {
       if (!state) throw new Error(t('detachFirst'));
-      const pageKey = selectionKey(tab.url);
-      const saved = (await chrome.storage.local.get(pageKey))[pageKey] || {};
+      if (tab.incognito) throw new Error(t('privateBounds'));
+      const pageKey = selectionKey(pageAddress(tab.url));
       const win = await chrome.windows.get(tab.windowId);
-      const bounds = saved.bounds ? undefined : {left: win.left, top: win.top, width: win.width, height: win.height};
-      if (bounds) saved.bounds = bounds;
-      else delete saved.bounds;
-      await chrome.storage.local.set({[pageKey]: saved});
-      return {saved: !!bounds};
+      return inPreferenceOrder(pageKey, async () => {
+        const saved = (await chrome.storage.local.get(pageKey))[pageKey] || {};
+        const bounds = saved.bounds ? undefined : {left: win.left, top: win.top, width: win.width, height: win.height};
+        if (bounds) saved.bounds = bounds;
+        else delete saved.bounds;
+        await chrome.storage.local.set({[pageKey]: saved});
+        return {saved: !!bounds};
+      });
     }
     case 'bookmark': {
       if (!state || typeof message.url !== 'string') throw new Error(t('detachFirst'));
       const link = new URL(message.url);
       const source = new URL(tab.url);
       if (link.origin !== source.origin || link.pathname !== source.pathname || !supported(link.href)) throw new Error(t('invalidLink'));
-      const folders = await chrome.bookmarks.search({title: 'Separate windows'});
-      let folder = folders.find(item => !item.url);
-      if (!folder) folder = await chrome.bookmarks.create({title: 'Separate windows'});
-      await chrome.bookmarks.create({parentId: folder.id, title: tab.title || 'Separate Window', url: link.href});
+      await inPreferenceOrder('bookmarks', async () => {
+        const folders = await chrome.bookmarks.search({title: 'Separate windows'});
+        let folder = folders.find(item => !item.url);
+        if (!folder) folder = await chrome.bookmarks.create({title: 'Separate windows'});
+        await chrome.bookmarks.create({parentId: folder.id, title: tab.title || 'Separate Window', url: link.href});
+      });
       return;
     }
     case 'capture': {
       if (!state) throw new Error(t('noSeparateWindow'));
-      const [active] = await chrome.tabs.query({active: true, windowId: tab.windowId});
-      if (active?.id !== tabId) throw new Error(t('activePageRequired'));
-      return {image: await chrome.tabs.captureVisibleTab(tab.windowId, {format: 'png'})};
+      async function stillActive() {
+        const [active] = await chrome.tabs.query({active: true, windowId: tab.windowId});
+        if (active?.id !== tabId) throw new Error(t('activePageRequired'));
+      }
+      await stillActive();
+      const image = await chrome.tabs.captureVisibleTab(tab.windowId, {format: 'png'});
+      await stillActive();
+      return {image};
     }
     default: throw new Error(t('unknownCommand'));
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || typeof message?.type !== 'string') return false;
   const task = message.type === 'translations' ? SWI18n.reload().then(() => ({language:SWI18n.language, preference:SWI18n.preference, messages:SWI18n.messages})) : SWI18n.ready.then(() => handle(message, sender));
   task.then(result => respond({ok: true, ...result}), error => respond({ok: false, error: error.message}));
   return true;
@@ -197,20 +276,34 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.removeAll(() => chrome.contextMenus.create({id: 'select', title: t('contextMenu'), contexts: ['all'], documentUrlPatterns: ['http://*/*', 'https://*/*', 'file:///*']}));
 });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'select') tell(tab.id, 'select').catch(console.error);
+  if (info.menuItemId === 'select' && tab) toggleSelection(tab.id).catch(console.error);
 });
 SWI18n.onChange(() => chrome.contextMenus.update('select', {title:t('contextMenu')}).catch(() => {}));
-chrome.commands.onCommand.addListener(async command => {
+chrome.commands.onCommand.addListener(async (command, triggeredTab) => {
   if (command !== 'select') return;
   await SWI18n.ready;
-  const [tab] = await chrome.tabs.query({active: true, lastFocusedWindow: true});
-  if (tab) handle({type: 'select', tabId: tab.id}, {url: chrome.runtime.getURL('popup.html')}).catch(console.error);
+  const tab = triggeredTab || (await chrome.tabs.query({active: true, lastFocusedWindow: true}))[0];
+  if (tab) toggleSelection(tab.id).catch(console.error);
 });
+function toggleSelection(tabId) {
+  return handle({type: 'select', tabId}, {url: chrome.runtime.getURL('popup.html')});
+}
 chrome.tabs.onUpdated.addListener((tabId, change) => {
-  if (!change.url) return;
+  if (!supported(change.url)) return;
   const key = sessionKey(tabId);
-  chrome.storage.session.get(key).then(data => {
-    if (data[key]) return chrome.storage.session.set({[key]: {...data[key], url: change.url.split('#__sw_local=')[0]}});
+  inTabOrder(tabId, async () => {
+    const state = (await chrome.storage.session.get(key))[key];
+    if (state) await chrome.storage.session.set({[key]: {...state, url: pageAddress(change.url)}});
+  }).catch(console.error);
+});
+
+chrome.tabs.onAttached.addListener((tabId, info) => {
+  inTabOrder(tabId, async () => {
+    const key = sessionKey(tabId);
+    const state = (await chrome.storage.session.get(key))[key];
+    if (!state || state.popupWindowId === info.newWindowId) return;
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (tab && tab.windowId !== state.popupWindowId) await finishRestore(tabId, state);
   }).catch(console.error);
 });
 
@@ -224,12 +317,16 @@ async function recoverClosedPopup(tabId, info) {
     if (origin) {
       await chrome.tabs.create({windowId: origin.id, index: state.index, url: state.url, active: true, pinned: !!state.pinned});
     } else {
-      await chrome.windows.create({url: state.url, type: 'normal', incognito: !!state.incognito, focused: true});
+      const window = await chrome.windows.create({url: state.url, type: 'normal', incognito: !!state.incognito, focused: true});
+      if (state.pinned) {
+        const [tab] = await chrome.tabs.query({windowId: window.id});
+        if (tab) await chrome.tabs.update(tab.id, {pinned: true}).catch(() => {});
+      }
     }
-    await removePlaceholder(state);
   }
+  await removePlaceholder(state);
   await chrome.storage.session.remove(key);
 }
 chrome.tabs.onRemoved.addListener((tabId, info) => {
-  recoverClosedPopup(tabId, info).catch(console.error);
+  inTabOrder(tabId, () => recoverClosedPopup(tabId, info)).catch(console.error);
 });

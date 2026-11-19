@@ -27,11 +27,14 @@ def main():
             page.set_viewport_size({'width':376,'height':600})
             page.goto(f'chrome-extension://{worker.url.split("/")[2]}/popup.html')
             page.locator('#version').wait_for()
+            shortcut = worker.evaluate("async()=> (await chrome.commands.getAll()).find(c=>c.name==='select')?.shortcut || ''")
             for lang in ('ru','en'):
                 page.locator(f'[data-language="{lang}"]').click()
                 page.wait_for_function('(lang)=>document.documentElement.lang===lang',arg=lang)
                 page.wait_for_function('![...document.querySelectorAll("[data-language]")].some(b=>b.disabled)')
                 assert page.locator('#status').inner_text()==''
+                expected = shortcut or json.loads((ROOT/f'_locales/{lang}/messages.json').read_text(encoding='utf-8'))['shortcutUnassigned']['message']
+                page.wait_for_function('value=>document.querySelector("#shortcut-keys").textContent===value', arg=expected)
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                 height=page.locator('body').bounding_box()['height']
                 assert height<=600, f'{lang} popup exceeds Chrome height: {height}'

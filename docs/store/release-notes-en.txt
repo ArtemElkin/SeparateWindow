@@ -1,1 +1,1 @@
-Fixed YouTube scaling in the separate window. The timeline stays aligned with the pointer when the window is resized, and the outer scrollbars are hidden.
+Improved tab restoration and picture-in-picture cleanup. If the selected element disappears, the original page is shown again. Incognito selections and geometry aren’t saved, and the menu shows the shortcut configured in Chrome.

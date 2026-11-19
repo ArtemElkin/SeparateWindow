@@ -110,12 +110,24 @@ async function videoPinFrame(selector, toggle = false) {
     }
     if (!document.pictureInPictureEnabled || video.disablePictureInPicture) return {error: 'pipBlocked'};
     await video.requestPictureInPicture();
+    globalThis.__swPinnedVideo = video;
     video.addEventListener('leavepictureinpicture', () => {
+      if (globalThis.__swPinnedVideo === video) delete globalThis.__swPinnedVideo;
       chrome.runtime.sendMessage({type: 'pip-state', active: false}).catch(() => {});
     }, {once: true});
     return {active: true};
   } catch {
     return {error: 'pipBlocked'};
+  }
+}
+
+async function resetDetachedMedia() {
+  globalThis.__swCleanMedia?.();
+  delete globalThis.__swCleanMedia;
+  const video = globalThis.__swPinnedVideo;
+  delete globalThis.__swPinnedVideo;
+  if (video && video.getRootNode().pictureInPictureElement === video) {
+    await document.exitPictureInPicture().catch(() => {});
   }
 }
 
@@ -174,7 +186,8 @@ function cleanMediaFrame(selector, roots, enabled, mediaPaths = []) {
     target = candidates[0];
     if (!target) return;
     controls = target.localName === 'video' && target.hasAttribute('controls');
-    target.removeAttribute('controls'); target.setAttribute(targetAttr, '');
+    if (target.localName === 'video') target.removeAttribute('controls');
+    target.setAttribute(targetAttr, '');
     if (target === scope && !path.length) {
       style = document.createElement('style');
       style.textContent = `[${targetAttr}]{border:0!important;outline:0!important;box-shadow:none!important;object-fit:contain!important;background:#000!important}`;
