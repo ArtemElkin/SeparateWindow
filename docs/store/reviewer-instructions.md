@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.5
+# Reviewer instructions — Separate Window 1.4.6
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -12,6 +12,8 @@ The publisher is Mycelium; support: qobuz43@gmail.com.
 7. A cross-origin iframe is selected as a whole. Selection intercepts pointer events instead of toggling the player's play/pause controls.
 
 For a supported player, click the video surface in the picker to select the whole player. After detaching, use its timeline and quality menu, then click the center once to pause or resume. Use the player’s fullscreen button to enter fullscreen. “Video only” and “Show player” toggle between a clean picture and the original controls without reloading.
+
+Resize a detached YouTube window and hover or click around 70% of the timeline. The pointer and preview or seek position should agree, and the window should have no outer scrollbars. Repeat after using the zoom buttons.
 8. Start a video and use “Always on top” in the hover toolbar. Chrome opens the video in its built-in picture-in-picture player, including nested cross-origin frames inside closed web components. Press “Unpin” or close the floating window to return to the player. Site controls and subtitles may be unavailable, and some players prohibit PiP.
 
 9. Change Language in the extension menu using the RU / EN buttons (browser language is the initial default). Verify that the popup, existing picker/toolbar, tooltips, messages and context menu update without reloading the page, and the preference survives reopening the menu.

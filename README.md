@@ -4,7 +4,7 @@
 
 ![Separate Window](icons/icon128.png)
 
-Материалы и инструкция публикации: [docs/store/README.md](docs/store/README.md). Команда `python tools/package.py` собирает `dist/separate-window-1.4.5.zip` для Chrome Web Store и отдельный архив с изображениями и текстами `dist/chrome-web-store-materials-1.4.5.zip`.
+Материалы и инструкция публикации: [docs/store/README.md](docs/store/README.md). Команда `python tools/package.py` собирает `dist/separate-window-1.4.6.zip` для Chrome Web Store и отдельный архив с изображениями и текстами `dist/chrome-web-store-materials-1.4.6.zip`.
 
 Издатель: **Mycelium**. Поддержка: **qobuz43@gmail.com**. [Политика конфиденциальности](https://merlinrus.github.io/SeparateWindow/privacy.html).
 

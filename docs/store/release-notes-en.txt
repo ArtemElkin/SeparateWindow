@@ -1,1 +1,1 @@
-Videos open with the original timeline and quality controls. “Video only” hides the panels when you want a clean view. Use the player or extension fullscreen button to go fullscreen.
+Fixed YouTube scaling in the separate window. The timeline stays aligned with the pointer when the window is resized, and the outer scrollbars are hidden.

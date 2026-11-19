@@ -49,15 +49,18 @@ class PipHandler(Handler):
                 document.getElementById('nested-host').attachShadow({{mode: 'closed'}}).innerHTML =
                     '<iframe style="width:100%;height:100%;border:0" src="http://127.0.0.1:{port}/video?selected"></iframe>';
                 </script>''',
-            '/player-hud': '''<style>body{margin:0}header{height:24px}#movie_player{position:relative;width:720px;height:405px}
+            '/player-hud': '''<html class="site-layout"><style>body{margin:0}header{height:24px}
+                html.site-layout{overflow:scroll!important}
+                #movie_player{position:relative;width:720px;height:405px;overflow:auto}
                 #surface,video{width:100%;height:100%}#player-controls{position:absolute;top:24px;width:720px;height:405px;pointer-events:none}
                 #surface-hit{position:absolute;inset:30% 30% 30% 30%;background:none;border:0;pointer-events:auto}
                 #hud{position:absolute;bottom:0;left:0;right:0;background:white;pointer-events:auto}
+                #seek{width:100%;height:16px;background:#aaa}
                 #quality-menu{position:absolute;bottom:30px;right:0;background:white}</style>
-                <header>Page outside the player</header><div id="movie_player" class="html5-video-player">
-                <div id="surface"><video autoplay muted></video></div></div>
+                <body><header>Page outside the player</header><div id="movie_player" class="html5-video-player">
+                <div id="surface" class="html5-video-container"><video class="html5-main-video" style="width:760px;height:430px" autoplay muted></video></div></div>
                 <div id="player-controls"><button id="surface-hit" aria-label="Play or pause"></button>
-                <div id="hud"><input id="seek" type="range" aria-label="Seek"><button id="settings">Settings</button>
+                <div id="hud"><div id="seek" role="slider" aria-label="Seek"></div><button id="settings">Settings</button>
                 <button id="fullscreen">Fullscreen</button></div>
                 <div id="quality-menu" hidden><button id="hd">1080p</button></div></div>''' + STREAM + '''
                 <script>const movie = document.querySelector('#movie_player');
@@ -68,7 +71,12 @@ class PipHandler(Handler):
                 overlay.querySelector('#fullscreen').onclick = () => movie.requestFullscreen();
                 overlay.querySelector('#settings').onclick = () => overlay.querySelector('#quality-menu').hidden = false;
                 overlay.querySelector('#hd').onclick = () => {movie.dataset.quality = '1080p';overlay.querySelector('#quality-menu').hidden = true;};
-                overlay.querySelector('#seek').oninput = e => {movie.dataset.seek = e.target.value;};</script>
+                const timeline = overlay.querySelector('#seek');
+                function percentage(event) {
+                    return Math.round(100 * (event.clientX - timeline.getBoundingClientRect().left) / timeline.clientWidth);
+                }
+                timeline.onpointermove = event => {movie.dataset.hover = percentage(event);};
+                timeline.onclick = event => {movie.dataset.seek = percentage(event);};</script>
                 <style>#quality-menu{pointer-events:auto}</style>''',
             '/video': player,
         }
@@ -157,7 +165,7 @@ def main():
                 close_browser = context.close
             try:
                 worker = context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
-                labels = worker.evaluate("Object.fromEntries(['pinTitle','unpinTitle','pinPreviewContinueTitle','pipBlocked','showPlayer','onlyVideo'].map(k=>[k,chrome.i18n.getMessage(k)]))")
+                labels = worker.evaluate("Object.fromEntries(['pinTitle','unpinTitle','pinPreviewContinueTitle','pipBlocked','showPlayer','onlyVideo','zoomOut'].map(k=>[k,chrome.i18n.getMessage(k)]))")
                 page.goto(url)
                 video_frame = next(frame for frame in page.frames if frame.url.endswith('/video'))
                 video_frame.wait_for_function('document.querySelector("video").readyState>=2')
@@ -292,8 +300,33 @@ def main():
                 page.locator('#settings').click()
                 page.locator('#hd').click()
                 assert page.locator('#movie_player').get_attribute('data-quality') == '1080p'
-                page.locator('#seek').fill('73')
-                assert page.locator('#movie_player').get_attribute('data-seek') == '73'
+                movie = page.locator('#movie_player')
+
+                def check_timeline():
+                    seek = page.locator('#seek')
+                    rect = seek.bounding_box()
+                    point = (rect['x'] + rect['width'] * .70, rect['y'] + rect['height'] / 2)
+                    page.mouse.move(*point)
+                    hover = movie.get_attribute('data-hover')
+                    assert hover is not None and abs(int(hover) - 70) <= 1, (page.viewport_size, hover)
+                    page.mouse.click(*point)
+                    assert abs(int(movie.get_attribute('data-seek')) - 70) <= 1
+                    assert page.evaluate('''() => {
+                        const root = document.documentElement;
+                        const player = document.querySelector('#movie_player');
+                        return getComputedStyle(root).overflow === 'hidden' &&
+                            root.clientWidth === innerWidth && root.clientHeight === innerHeight &&
+                            getComputedStyle(player).overflow === 'hidden';
+                    }'''), 'Separate window must not expose document or player scrollbars'
+
+                for width, height in [(640, 360), (1030, 490)]:
+                    page.set_viewport_size({'width': width, 'height': height})
+                    check_timeline()
+                before_zoom = movie.bounding_box()['width']
+                button('zoomOut')
+                page.wait_for_function('(width) => document.querySelector("#movie_player").clientWidth < width - 20', arg=before_zoom)
+                check_timeline()
+                print('PASS: timeline hover and clicks agree at 70% after resizing and manual zoom, with no scrollbars', flush=True)
                 button('onlyVideo')
                 page.locator('#player-controls').wait_for(state='hidden')
                 button('showPlayer')
@@ -303,6 +336,8 @@ def main():
                 assert page.locator('#movie_player').evaluate('(e)=>Math.abs(e.getBoundingClientRect().width - innerWidth)<1')
                 page.evaluate('document.exitFullscreen()')
                 assert page.evaluate('window.identity') == identity
+                worker.evaluate('''async url => {const [tab]=await chrome.tabs.query({url});await restore(tab.id)}''', hud_url)
+                assert page.evaluate('getComputedStyle(document.documentElement).overflow') == 'scroll'
                 print('PASS: player picked from the video surface, settings/seek reachable, single-click pause and explicit fullscreen', flush=True)
 
             finally:
