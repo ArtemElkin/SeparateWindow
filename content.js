@@ -363,7 +363,8 @@
     notify(t('pinChooseTab'));
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {displaySurface: 'browser'}, audio: false, preferCurrentTab: true,
+        video: {displaySurface: 'browser', frameRate: {ideal: 120}},
+        audio: false, preferCurrentTab: true,
         selfBrowserSurface: 'include', surfaceSwitching: 'exclude', monitorTypeSurfaces: 'exclude'
       });
     } catch {

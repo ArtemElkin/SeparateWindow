@@ -104,6 +104,8 @@ def test_widget_preview(page, video_frame, node_with, button, labels, restore_wi
         page.evaluate('window.widgetTrack = documentPictureInPicture.window.document.querySelector("video").srcObject.getVideoTracks()[0]')
 
     open_preview()
+    settings = page.evaluate('widgetTrack.getSettings()')
+    assert settings['frameRate'] == 120, settings
 
     def preview_color(channel):
         pixels = '''() => {
@@ -135,7 +137,7 @@ def test_widget_preview(page, video_frame, node_with, button, labels, restore_wi
     restore_widget()
     page.wait_for_function('widgetTrack.readyState === "ended" && !documentPictureInPicture.window')
     assert page.locator('#widget button').inner_text() == 'Updated'
-    print('PASS: widget preview updates, leaves source interactive and stops capture on close or restore', flush=True)
+    print('PASS: widget preview negotiates 120 fps, updates live and stops capture on close or restore', flush=True)
 def main():
     system_chrome = '--chrome' in sys.argv
     server = ThreadingHTTPServer(('127.0.0.1', 0), PipHandler)

@@ -1,1 +1,1 @@
-Improved tab restoration and picture-in-picture cleanup. If the selected element disappears, the original page is shown again. Incognito selections and geometry aren’t saved, and the menu shows the shortcut configured in Chrome.
+Live previews in Always on top mode now support up to 120 fps.

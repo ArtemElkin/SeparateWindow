@@ -1,4 +1,4 @@
-# Reviewer instructions — Separate Window 1.4.7
+# Reviewer instructions — Separate Window 1.4.8
 
 No account, credentials, payment, external application or server is required.
 The publisher is Mycelium; support: qobuz43@gmail.com.
@@ -27,4 +27,4 @@ Run `python tests/smoke.py` for the isolated Chromium test. Run `python tools/st
 
 11. Check the full-size toolbar icon. In the popup, “Rate us” opens Chrome Web Store reviews. “Report a bug” and “Suggest a feature” open separate localized GitHub issue drafts containing the extension version. The user submits them manually. No active page address or content is attached. An email link is also available. `python tests/popup.py` checks both locales, layout, destinations and icon sizes.
 
-12. On an HTTPS page, use “Always on top” with a widget or image. Choose “This tab” in Chrome’s sharing dialog. Click “Open preview” if Chrome requires another interaction. The floating preview updates while you use the original widget. Closing it stops sharing. On Windows, use Chrome 156 or later. `python tests/pip.py --chrome` checks live pixel updates, capture cleanup, and nested video players in installed Chrome. `python tests/pip.py` exercises the video scenarios in bundled Chromium.
+12. On an HTTPS page, use “Always on top” with a widget or image. Choose “This tab” in Chrome’s sharing dialog. Click “Open preview” if Chrome requires another interaction. The floating preview updates while you use the original widget and requests capture at up to 120 fps. Closing it stops sharing. On Windows, use Chrome 156 or later. `python tests/pip.py --chrome --headed` checks the capture frame-rate setting, live pixel updates, capture cleanup, and nested video players in installed Chrome. `python tests/pip.py` exercises the video scenarios in bundled Chromium.
