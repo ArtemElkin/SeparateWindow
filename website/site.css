@@ -122,8 +122,12 @@ h3 { font-size: 1.125rem; line-height: 1.4; }
 .uses { display: grid; grid-template-columns: .9fr 1fr 1fr; gap: 32px; }
 .uses p { color: #d4def9; }
 .faq { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,3fr); gap: clamp(24px, 3.5vw, 72px); padding-block: var(--section-space); }
-.faq a { display: inline-block; margin-top: 16px; color: var(--blue-dark); font-weight: 750; text-underline-offset: 4px; }
-.answers { display: grid; gap: 8px; }
+.support p { max-width: 45ch; }
+.support-email { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; color: var(--blue-dark); font-size: 1.125rem; font-weight: 750; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.feedback-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.feedback-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--blue-dark); background: var(--white); font-size: .875rem; font-weight: 750; text-decoration: none; }
+.feedback-links a:active { background: #e0e7ff; }
+.answers { display: grid; gap: 8px; margin-top: 16px; }
 .answers details { border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
 .answers summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 16px; border-radius: 12px; font-weight: 750; cursor: pointer; list-style: none; }
 .answers summary::marker { content: ""; }
@@ -163,6 +167,7 @@ details[open] .faq-icon::after { opacity: 0; transform: rotate(0); }
   .languages a:hover:not([aria-current]) { background: var(--white); }
   .primary:hover { background: var(--blue-dark); }
   .demo-tabs button:hover:not([aria-pressed=true]), #move-block:hover { background: #38466d; }
+  .feedback-links a:hover { background: #edf1ff; }
   .answers summary:hover .faq-icon { background: #e0e7ff; }
   .credit a:hover { text-decoration: none; }
   .credit a:hover::after { transform: scaleX(1); opacity: 1; }

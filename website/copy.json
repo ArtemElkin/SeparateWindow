@@ -39,8 +39,9 @@
     "widget_use": "Графики и виджеты",
     "widget_text": "Держите под рукой живой график, карту или нужную часть дашборда. Блок продолжает работать на исходной странице.",
     "questions": "Частые вопросы",
-    "help_text": "Если окно не открылось или блок отображается неправильно, пришлите ссылку и шаги, на которых возникла проблема.",
-    "contact": "Написать в поддержку",
+    "help_text": "Напишите нам по почте или откройте обращение на GitHub. Если что-то сломалось, приложите ссылку на страницу и опишите, как повторить проблему.",
+    "bug_label": "Сообщить о баге",
+    "feature_label": "Предложить функцию",
     "q1": "Можно закрепить окно поверх остальных?",
     "a1": "Для совместимых видео Chrome открывает «Картинку в картинке». Для других блоков расширение предлагает живой предпросмотр поверх окон после разрешения на показ текущей вкладки. С самим блоком можно взаимодействовать в исходном окне.",
     "q2": "Работает ли расширение на любой странице?",
@@ -50,8 +51,7 @@
     "q4": "Зачем расширению доступ к сайтам?",
     "a4": "Он нужен, чтобы найти выбранный блок и скрыть окружающую страницу. Расширение обрабатывает эти данные локально и не отправляет содержимое страниц на сервер.",
     "closing": "Что откроете первым?",
-    "privacy": "Конфиденциальность",
-    "feedback": "Сообщить о проблеме"
+    "privacy": "Конфиденциальность"
   },
   "en": {
     "locale": "en_US",
@@ -93,8 +93,9 @@
     "widget_use": "Charts and widgets",
     "widget_text": "Keep a live chart, map or part of a dashboard handy. The block continues to run on its original page.",
     "questions": "Common questions",
-    "help_text": "If a window fails to open or a block looks wrong, send the page link and the steps that led to the problem.",
-    "contact": "Email support",
+    "help_text": "Email us or open an issue on GitHub. If something broke, include the page link and the steps to reproduce it.",
+    "bug_label": "Report a bug",
+    "feature_label": "Suggest a feature",
     "q1": "Can I keep a window on top?",
     "a1": "Chrome opens supported videos in picture-in-picture. Other blocks can open as a live preview on top once you allow sharing the current tab. You can interact with the block in the original window.",
     "q2": "Does it work on every page?",
@@ -104,7 +105,6 @@
     "q4": "Why does the extension need access to websites?",
     "a4": "It uses access to locate your selection and hide the surrounding page. It processes that data locally and sends no page content to a server.",
     "closing": "What will you open first?",
-    "privacy": "Privacy",
-    "feedback": "Report a problem"
+    "privacy": "Privacy"
   }
 }

@@ -8,6 +8,7 @@ from html import escape
 from pathlib import Path
 from shutil import copyfile
 from string import Template
+from urllib.parse import urlencode
 
 from PIL import Image
 
@@ -17,6 +18,7 @@ ROOT = SOURCE.parent
 OUTPUT = ROOT / 'dist' / 'website'
 HOST = 'https://separate.maark.ru'
 STORE = 'https://chromewebstore.google.com/detail/separate-window/fhcafcdfknddjfgbbkhpglgamceiclcm'
+ISSUES = 'https://github.com/MerlinRus/SeparateWindow/issues/new'
 ROUTES = {'ru': '/', 'en': '/en/'}
 
 
@@ -33,6 +35,13 @@ def main():
     script_version = sha256((SOURCE / 'site.js').read_bytes()).hexdigest()[:12]
     for lang, path in ROUTES.items():
         variables = {key: escape(value, quote=True) for key, value in copy[lang].items()}
+        messages = json.loads((ROOT / '_locales' / lang / 'messages.json').read_text(encoding='utf-8'))
+        for kind in ('bug', 'feature'):
+            query = urlencode({
+                'title': messages[f'{kind}Title']['message'],
+                'body': messages[f'{kind}Body']['message'].replace('$1', '…'),
+            })
+            variables[f'{kind}_url'] = escape(f'{ISSUES}?{query}', quote=True)
         current = ' aria-current="page"'
         page = template.substitute(
             **variables, lang=lang, home=path, canonical=HOST + path, store=STORE,
