@@ -41,7 +41,8 @@ def main():
             current_en=current if lang == 'en' else '',
         )
         write(path.lstrip('/') + 'index.html', page)
-    write('404.html', (SOURCE / '404.html').read_text(encoding='utf-8'))
+    missing = Template((SOURCE / '404.html').read_text(encoding='utf-8'))
+    write('404.html', missing.substitute(style_version=style_version))
     write('robots.txt', f'User-agent: *\nAllow: /\nSitemap: {HOST}/sitemap.xml\n')
     urls = '\n'.join(f'  <url><loc>{HOST}{path}</loc></url>' for path in ROUTES.values())
     write('sitemap.xml', f'<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -49,8 +50,10 @@ def main():
 
     privacy = (ROOT / 'docs' / 'privacy.html').read_text(encoding='utf-8')
     style = re.search(r'<style>(.*?)</style>', privacy, flags=re.DOTALL)
-    write('assets/privacy.css', style.group(1).strip() + '\n')
-    privacy = privacy.replace(style.group(), '<link rel="stylesheet" href="/assets/privacy.css">')
+    privacy_css = style.group(1).strip() + '\n'
+    write('assets/privacy.css', privacy_css)
+    privacy_version = sha256(privacy_css.encode('utf-8')).hexdigest()[:12]
+    privacy = privacy.replace(style.group(), f'<link rel="stylesheet" href="/assets/privacy.css?v={privacy_version}">')
     privacy = privacy.replace('src="store/assets/icon128.png"', 'src="/assets/icon.png"')
     privacy = privacy.replace('<body><main>', '<body><main><p><a href="/">Separate Window</a></p>')
     write('privacy.html', privacy)
