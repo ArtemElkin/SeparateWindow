@@ -19,8 +19,8 @@
   <meta property="og:image" content="https://separate.maark.ru/assets/share.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/assets/site.css">
-  <script src="/assets/site.js" defer></script>
+  <link rel="stylesheet" href="/assets/site.css?v=$style_version">
+  <script src="/assets/site.js?v=$script_version" defer></script>
 </head>
 <body data-detach="$detach" data-restore="$restore" data-detached="$detached" data-restored="$restored">
   <a class="skip" href="#main">$skip</a>
@@ -103,7 +103,7 @@
         </div>
       </div>
     </section>
-    <section id="how" class="shell how">
+    <section id="how" class="shell how" data-reveal>
       <h2>$how</h2>
       <ol class="steps">
         <li><h3>$step_one</h3><p>$step_one_text</p></li>
@@ -111,7 +111,7 @@
         <li><h3>$step_three</h3><p>$step_three_text</p></li>
       </ol>
     </section>
-    <section class="band">
+    <section class="band" data-reveal>
       <div class="shell uses">
         <h2>$uses</h2>
         <div><h3>$video_use</h3><p>$video_text</p></div>
@@ -121,10 +121,10 @@
     <section class="shell faq" id="support">
       <div><h2>$questions</h2><p>$help_text</p><a href="mailto:qobuz43@gmail.com">$contact</a></div>
       <div class="answers">
-        <details><summary>$q1</summary><p>$a1</p></details>
-        <details><summary>$q2</summary><p>$a2</p></details>
-        <details><summary>$q3</summary><p>$a3</p></details>
-        <details><summary>$q4</summary><p>$a4</p></details>
+        <details><summary>$q1<span class="faq-icon" aria-hidden="true"></span></summary><p>$a1</p></details>
+        <details><summary>$q2<span class="faq-icon" aria-hidden="true"></span></summary><p>$a2</p></details>
+        <details><summary>$q3<span class="faq-icon" aria-hidden="true"></span></summary><p>$a3</p></details>
+        <details><summary>$q4<span class="faq-icon" aria-hidden="true"></span></summary><p>$a4</p></details>
       </div>
     </section>
     <div class="shell bottom">
@@ -133,12 +133,15 @@
     </div>
   </main>
   <footer class="shell footer">
-    <span>Separate Window <span class="muted">· Mycelium</span></span>
-    <nav aria-label="$footer_navigation">
-      <a href="/privacy.html#$lang">$privacy</a>
-      <a href="https://github.com/MerlinRus/SeparateWindow">GitHub</a>
-      <a href="https://github.com/MerlinRus/SeparateWindow/issues">$feedback</a>
-    </nav>
+    <div class="footer-main">
+      <span>Separate Window <span class="muted">· Mycelium</span></span>
+      <nav aria-label="$footer_navigation">
+        <a href="/privacy.html#$lang">$privacy</a>
+        <a href="https://github.com/MerlinRus/SeparateWindow">GitHub</a>
+        <a href="https://github.com/MerlinRus/SeparateWindow/issues">$feedback</a>
+      </nav>
+    </div>
+    <p class="credit" lang="en">Design &amp; Build by <a href="https://maark.ru/">MAARK</a></p>
   </footer>
 </body>
 </html>

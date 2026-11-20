@@ -3,6 +3,7 @@
 import json
 import re
 import tarfile
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 from shutil import copyfile
@@ -28,11 +29,14 @@ def write(path, content):
 def main():
     template = Template((SOURCE / 'index.html').read_text(encoding='utf-8'))
     copy = json.loads((SOURCE / 'copy.json').read_text(encoding='utf-8'))
+    style_version = sha256((SOURCE / 'site.css').read_bytes()).hexdigest()[:12]
+    script_version = sha256((SOURCE / 'site.js').read_bytes()).hexdigest()[:12]
     for lang, path in ROUTES.items():
         variables = {key: escape(value, quote=True) for key, value in copy[lang].items()}
         current = ' aria-current="page"'
         page = template.substitute(
             **variables, lang=lang, home=path, canonical=HOST + path, store=STORE,
+            style_version=style_version, script_version=script_version,
             current_ru=current if lang == 'ru' else '',
             current_en=current if lang == 'en' else '',
         )
