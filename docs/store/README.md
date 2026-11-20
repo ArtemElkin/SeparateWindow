@@ -11,7 +11,10 @@
 4. **Промо:** `assets/promo-440x280.png` и `assets/promo-1400x560.png` — название Separate Window, английская подпись «Video (and more) in a separate window :)» и иллюстрация переноса плеера со страницы с баннерами в чистое окно. Малое промо используется для картинки поиска; широкое имеет отдельную композицию. Исходники и обоснование: [promo-tile.md](promo-tile.md).
 5. **Тексты карточки:** `listing-ru.md` и `listing-en.md`.
 6. **Privacy practices:** `privacy-fields.md`; инструкции проверки — `reviewer-instructions.md`.
-7. **Privacy policy URL:** https://merlinrus.github.io/SeparateWindow/privacy.html
+7. **Privacy policy URL:** https://separate.maark.ru/privacy.html
+
+- **Homepage URL:** https://separate.maark.ru/
+- **Support URL:** https://separate.maark.ru/#support
 8. **Глобальный проморолик:** `videos/global-promo-1.4.0.mp4` — 24,47 секунды, английские подписи, оригинальная фоновая музыка. Загрузите на YouTube и вставьте ссылку в поле «Глобальный проморолик». Текст для загрузки и исходники описаны в [promo-video.md](promo-video.md).
 
 Комплект `dist/chrome-web-store-materials-1.4.8.zip` содержит изображения, проморолик и тексты. **Его не нужно загружать как пакет расширения.**

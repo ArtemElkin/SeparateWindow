@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="$lang">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f5f7">
+  <title>$title</title>
+  <meta name="description" content="$description">
+  <link rel="canonical" href="$canonical">
+  <link rel="alternate" hreflang="ru" href="https://separate.maark.ru/">
+  <link rel="alternate" hreflang="en" href="https://separate.maark.ru/en/">
+  <link rel="alternate" hreflang="x-default" href="https://separate.maark.ru/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Separate Window">
+  <meta property="og:title" content="$title">
+  <meta property="og:description" content="$description">
+  <meta property="og:url" content="$canonical">
+  <meta property="og:locale" content="$locale">
+  <meta property="og:image" content="https://separate.maark.ru/assets/share.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/assets/site.css">
+  <script src="/assets/site.js" defer></script>
+</head>
+<body data-detach="$detach" data-restore="$restore" data-detached="$detached" data-restored="$restored">
+  <a class="skip" href="#main">$skip</a>
+  <header class="shell top">
+    <a class="brand" href="$home">
+      <img src="/assets/icon.png" width="36" height="36" alt="">
+      <span>Separate Window</span>
+    </a>
+    <nav class="topnav" aria-label="$navigation">
+      <a class="nav-copy" href="#how">$how</a>
+      <a class="nav-copy" href="#support">$support</a>
+      <div class="languages" aria-label="$language">
+        <a href="/" lang="ru" hreflang="ru"$current_ru>RU</a>
+        <a href="/en/" lang="en" hreflang="en"$current_en>EN</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="shell hero">
+      <div class="hero-copy">
+        <p class="eyebrow">$eyebrow</p>
+        <h1>$heading</h1>
+        <p class="lead">$lead</p>
+        <a class="primary" href="$store">$install <span aria-hidden="true">↗</span></a>
+        <p class="note">$free</p>
+      </div>
+      <div class="demo" data-scene="video" data-floating="true">
+        <div class="demo-top">
+          <span class="demo-label"><span aria-hidden="true"></span>$demo</span>
+          <div class="demo-tabs" role="group" aria-label="$example">
+            <button type="button" data-scene-button="video" aria-pressed="true">$video</button>
+            <button type="button" data-scene-button="dashboard" aria-pressed="false">$dashboard</button>
+          </div>
+        </div>
+        <div class="stage">
+          <div class="browser-window" aria-hidden="true">
+            <div class="browser-head">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="address">$example_site</span>
+              <img src="/assets/icon.png" width="18" height="18" alt="">
+            </div>
+            <div class="browser-body">
+              <div class="site-line"><strong class="video-view">$watch_title</strong><strong class="dashboard-view">$metrics</strong><span class="fake-links"></span></div>
+              <div class="ad strip video-view">$ad</div>
+              <div class="fake-data strip dashboard-view"></div>
+              <div class="browser-grid">
+                <div class="slot" id="source-slot"><span class="slot-mark">↗</span></div>
+                <aside class="dummy-side">
+                  <div class="ad video-view">$ad</div>
+                  <div class="fake-data dashboard-view"></div>
+                  <div class="skeleton"></div><div class="skeleton short"></div><div class="skeleton"></div>
+                </aside>
+              </div>
+              <div class="skeleton"></div><div class="skeleton short"></div>
+            </div>
+          </div>
+          <div class="art-window" id="floating-window" aria-hidden="true">
+            <div class="art-head">
+              <img src="/assets/icon.png" width="20" height="20" alt="">
+              <span class="video-view">$watch_title</span><span class="dashboard-view">$chart_title</span>
+              <span class="window-controls">− &nbsp; □ &nbsp; ×</span>
+            </div>
+            <div id="float-slot">
+              <div class="art" id="selected-block">
+                <img class="video-view landscape" src="/assets/landscape.webp" width="640" height="360" alt="" fetchpriority="high">
+                <div class="dashboard-view chart">
+                  <span class="chart-label">$chart_title</span>
+                  <strong>24<span>,</span>816</strong>
+                  <div class="chart-plot">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-bottom">
+          <p id="demo-status" role="status">$detached</p>
+          <button type="button" id="move-block">$restore</button>
+        </div>
+      </div>
+    </section>
+    <section id="how" class="shell how">
+      <h2>$how</h2>
+      <ol class="steps">
+        <li><h3>$step_one</h3><p>$step_one_text</p></li>
+        <li><h3>$step_two</h3><p>$step_two_text</p></li>
+        <li><h3>$step_three</h3><p>$step_three_text</p></li>
+      </ol>
+    </section>
+    <section class="band">
+      <div class="shell uses">
+        <h2>$uses</h2>
+        <div><h3>$video_use</h3><p>$video_text</p></div>
+        <div><h3>$widget_use</h3><p>$widget_text</p></div>
+      </div>
+    </section>
+    <section class="shell faq" id="support">
+      <div><h2>$questions</h2><p>$help_text</p><a href="mailto:qobuz43@gmail.com">$contact</a></div>
+      <div class="answers">
+        <details><summary>$q1</summary><p>$a1</p></details>
+        <details><summary>$q2</summary><p>$a2</p></details>
+        <details><summary>$q3</summary><p>$a3</p></details>
+        <details><summary>$q4</summary><p>$a4</p></details>
+      </div>
+    </section>
+    <div class="shell bottom">
+      <div><h2>$closing</h2><p>$free</p></div>
+      <a class="primary" href="$store">$install <span aria-hidden="true">↗</span></a>
+    </div>
+  </main>
+  <footer class="shell footer">
+    <span>Separate Window <span class="muted">· Mycelium</span></span>
+    <nav aria-label="$footer_navigation">
+      <a href="/privacy.html#$lang">$privacy</a>
+      <a href="https://github.com/MerlinRus/SeparateWindow">GitHub</a>
+      <a href="https://github.com/MerlinRus/SeparateWindow/issues">$feedback</a>
+    </nav>
+  </footer>
+</body>
+</html>

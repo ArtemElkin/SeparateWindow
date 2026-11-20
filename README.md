@@ -6,7 +6,9 @@
 
 Материалы и инструкция публикации: [docs/store/README.md](docs/store/README.md). Команда `python tools/package.py` собирает `dist/separate-window-1.4.8.zip` для Chrome Web Store и отдельный архив с изображениями и текстами `dist/chrome-web-store-materials-1.4.8.zip`. Результаты аудита: [docs/audit-1.4.7.md](docs/audit-1.4.7.md).
 
-Издатель: **Mycelium**. Поддержка: **qobuz43@gmail.com**. [Политика конфиденциальности](https://merlinrus.github.io/SeparateWindow/privacy.html).
+Издатель: **Mycelium**. Поддержка: **qobuz43@gmail.com**. [Сайт Separate Window](https://separate.maark.ru/) · [Политика конфиденциальности](https://separate.maark.ru/privacy.html).
+
+Исходники сайта лежат в `website/`. Команда `python website/build.py` собирает страницы на русском и английском и архив для выкладки. На сервере `sudo bash deploy.sh deploy separate-window-website.tar.gz` активирует новый выпуск в `/opt/separate-window`. Для первой настройки HTTPS используйте `sudo bash deploy.sh https`.
 
 ## Установка в Chrome
 
