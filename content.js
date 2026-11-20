@@ -29,12 +29,20 @@
   let blockPreview;
   let playerControls;
   const youtubePlayerSelector = '#movie_player.html5-video-player';
+  const twitchPlayerSelector = '[data-a-target="video-player"],[data-test-selector="video-player__video-layout"]';
+  const rutubePage = location.hostname === 'rutube.ru' || location.hostname.endsWith('.rutube.ru');
+  const rutubePlayerSelector = 'section.video-player';
+  const layoutPlayers = [youtubePlayerSelector, twitchPlayerSelector];
+  if (location.hostname === 'player.vimeo.com') layoutPlayers.push('#player');
+  if (rutubePage) {
+    layoutPlayers.push(rutubePlayerSelector, '[class*="touch-handlers-layout-module__layout___"]');
+  }
+  const layoutPlayerSelector = layoutPlayers.join(',');
   const playerContainers = [
-    '#movie_player', '.html5-video-player', 'vk-video-player', '.vp-player',
+    ...layoutPlayers, '#movie_player', '.html5-video-player', 'vk-video-player', '.vp-player',
     '.video-player', '.dmp_Player', '.video-js', '.jwplayer', '.plyr--video',
     '.shaka-video-container', 'media-player', 'mux-player'
   ];
-  if (location.hostname === 'player.vimeo.com') playerContainers.push('#player');
   const playerSelector = playerContainers.join(',');
 
   async function send(type, extra = {}) {
@@ -82,6 +90,10 @@
   }
 
   function cssSelector(element) {
+    // Known player roots may get a new framework-generated ID on each visit.
+    const playerRoot = layoutPlayers.find(candidate =>
+      element.matches(candidate) && document.querySelectorAll(candidate).length === 1);
+    if (playerRoot) return playerRoot;
     const parts = [];
     for (let node = element; node && node !== document.documentElement; node = node.parentElement) {
       if (node.id && document.querySelectorAll(`#${CSS.escape(node.id)}`).length === 1) {
@@ -104,7 +116,7 @@
   }
 
   function playerTarget(element) {
-    const player = element.closest(playerSelector);
+    const player = (rutubePage && element.closest(rutubePlayerSelector)) || element.closest(playerSelector);
     if (player && player.getClientRects().length) return player;
     if (element.closest('#player-controls')) {
       const youtube = document.querySelector(youtubePlayerSelector);
@@ -216,9 +228,11 @@
     const rotated = rotation % 180 !== 0;
     const fitW = rotated ? h : w, fitH = rotated ? w : h;
     const factor = fit ? Math.min(availableW / fitW, availableH / fitH) * scale : scale;
-    const resizePlayer = selected.matches(youtubePlayerSelector);
-    // YouTube's timeline combines browser coordinates with layout widths. Resize
-    // the player and its controls in layout so the two use the same units.
+    const youtube = selected.matches(youtubePlayerSelector);
+    const twitch = selected.matches(twitchPlayerSelector);
+    const resizePlayer = initialSize.media || selected.matches(layoutPlayerSelector);
+    // Resizing in layout keeps embedded viewports and player controls in sync
+    // with the visible size. Generic blocks keep their original layout.
     const fitted = value => fit ? `min(${100 * scale * value / fitW}vw, ${100 * scale * value / fitH}vh)` : `${value * scale}px`;
     const width = resizePlayer ? fitted(w) : `${w}px`;
     const height = resizePlayer ? fitted(h) : `${h}px`;
@@ -233,7 +247,6 @@
       `[${ancestorAttr}="${index}"]{display:${box.display}!important;box-sizing:content-box!important;width:${box.width}px!important;height:${box.height}px!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;container-type:${box.containerType}!important}`
     ).join('\n');
     cropStyle.textContent = `
-      html,body{overflow:hidden!important;min-width:0!important;min-height:0!important}
       ${ancestor}{display:contents!important;position:static!important;margin:0!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;outline:0!important;transform:none!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;filter:none!important;backdrop-filter:none!important;perspective:none!important;contain:none!important;container-type:normal!important;content-visibility:visible!important;clip:auto!important;clip-path:none!important;overflow:visible!important;opacity:1!important;isolation:auto!important;mix-blend-mode:normal!important;will-change:auto!important}
       ${ancestor}::before,${ancestor}::after{content:none!important;display:none!important}
       html${ancestor}{display:block!important;background:#000!important}
@@ -244,11 +257,18 @@
       ${controls}{z-index:2147483641!important;translate:none!important;rotate:none!important;scale:none!important;zoom:1!important;${cleanVideo ? 'display:none!important' : ''}}
       ${host}{display:block!important}
       ${layout}
+      html${ancestor},body${ancestor}{min-width:0!important;min-height:0!important;overflow:hidden!important;scrollbar-width:none!important}
       ${resizePlayer ? `
-        html${ancestor},body${ancestor}{width:100%!important;height:100%!important;overflow:hidden!important;scrollbar-width:none!important}
+        html${ancestor},body${ancestor}{width:100%!important;height:100%!important}
         ${target},${controls}{overflow:hidden!important}
+      ` : ''}
+      ${youtube ? `
         ${target} .html5-video-container,${target} .html5-video-container > video.html5-main-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;}
         ${target} video.html5-main-video{object-fit:contain!important}
+      ` : ''}
+      ${twitch ? `
+        ${target} :is(.video-player__container,[data-test-selector="video-player__video-container"],[data-a-target="video-ref"],[data-a-target="video-ref"] > video){position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important}
+        ${target} [data-a-target="video-ref"] > video{object-fit:contain!important}
       ` : ''}
     `;
   }
@@ -452,7 +472,8 @@
       const dialog = document.createElement('dialog');
       const text = document.createElement('div'); text.textContent = t('linkHelp');
       const input = document.createElement('input'); input.readOnly = true; input.value = windowLink(); input.setAttribute('aria-label', t('blockLink'));
-      const close = document.createElement('button'); close.textContent = t('close'); close.onclick = () => {dialog.close(); dialog.remove();};
+      const close = document.createElement('button'); close.textContent = t('close'); close.onclick = () => dialog.close();
+      dialog.addEventListener('close', () => dialog.remove(), {once: true});
       dialog.append(text, input, close); shadow.append(dialog); dialog.showModal(); input.focus(); input.select();
     });
     button('⛶', t('fullscreen'), () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
